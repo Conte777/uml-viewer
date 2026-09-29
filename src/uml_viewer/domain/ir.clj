@@ -80,6 +80,8 @@
              :fields (mapv as-member (:fields c))
              :ops (mapv as-member (:ops c))}
       (:ns c) (assoc :ns (str (:ns c)))
+      (:lang c) (assoc :lang (keyword (:lang c)))
+      (:file c) (assoc :file (str (:file c)))
       (some? (:level c)) (assoc :level (long (:level c))))))
 
 (defn- as-package [p]

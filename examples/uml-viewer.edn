@@ -4,31 +4,52 @@
  :prefix "uml-viewer",
  :edge-kinds
  {[:main.uml-viewer :adapters.core] :association,
+  [:main.ir-generator :typescript-language.graph-typescript] :association,
   [:application.document :domain.hierarchy] :association,
   [:main.ir-generator :clojure-language.graph-clojure] :association,
+  [:main.uml-viewer :rust-language.source-rust] :association,
   [:application.document :engine.compose] :association,
+  [:main.uml-viewer :typescript-language.source-typescript] :association,
   [:engine.compose :engine.layout] :association,
   [:engine.compose :engine.route] :association,
+  [:main.ir-generator :rust-language.graph-rust] :association,
   [:adapters.core :adapters.sketch] :association,
   [:main :application] :association,
   [:main.uml-viewer :clojure-language.source-clojure] :association,
   [:main :clojure-language] :association,
   [:main.ir-generator :application.ir-generator] :association,
-  [:main :adapters] :association},
+  [:main :adapters] :association,
+  [:main :rust-language] :association,
+  [:main :typescript-language] :association},
  :omit-edges [],
  :levels
- [[:domain :source :graph :clojure-language]
+ [[:domain :source :graph :clojure-language :typescript-language :rust-language]
   [:engine]
   [:application]
   [:adapters]
   [:main]],
  :policy-file "examples/uml-viewer.policy.edn",
- :order [:main :adapters :application :engine :source :graph :clojure-language :domain],
+ :order
+ [:main
+  :adapters
+  :application
+  :engine
+  :source
+  :graph
+  :clojure-language
+  :typescript-language
+  :rust-language
+  :domain],
  :omit [],
  :edges
  [{:from :main.uml-viewer, :to :adapters.core, :kind :dependency}
+  {:from :typescript-language.source-typescript, :to :source, :kind :implements}
+  {:from :main.ir-generator,
+   :to :typescript-language.graph-typescript,
+   :kind :dependency}
   {:from :clojure-language.source-clojure, :to :source, :kind :implements}
   {:from :adapters.draw, :to :application.document, :kind :dependency}
+  {:from :rust-language.source-rust, :to :source, :kind :implements}
   {:from :application.document, :to :domain.hierarchy, :kind :dependency}
   {:from :application.events, :to :domain.policy, :kind :dependency}
   {:from :adapters.sketch, :to :adapters.draw, :kind :dependency}
@@ -36,10 +57,13 @@
   {:from :application.document, :to :engine.hit, :kind :dependency}
   {:from :application.detail, :to :engine.layout, :kind :dependency}
   {:from :main.ir-generator, :to :clojure-language.graph-clojure, :kind :dependency}
+  {:from :rust-language.graph-rust, :to :graph, :kind :implements}
   {:from :application.detail, :to :application.overlay, :kind :dependency}
   {:from :engine.layout, :to :domain.geom, :kind :dependency}
+  {:from :main.uml-viewer, :to :rust-language.source-rust, :kind :dependency}
   {:from :adapters.sketch, :to :application.events, :kind :dependency}
   {:from :application.document, :to :engine.compose, :kind :dependency}
+  {:from :main.uml-viewer, :to :typescript-language.source-typescript, :kind :dependency}
   {:from :application.document, :to :domain.ir, :kind :dependency}
   {:from :adapters.draw, :to :application.detail, :kind :dependency}
   {:from :adapters.draw, :to :quil, :kind :dependency}
@@ -54,11 +78,13 @@
   {:from :clojure-language.graph-clojure, :to :graph, :kind :implements}
   {:from :adapters.draw, :to :domain.geom, :kind :dependency}
   {:from :application.events, :to :domain.hierarchy, :kind :dependency}
+  {:from :main.ir-generator, :to :graph, :kind :dependency}
   {:from :engine.compose, :to :engine.layout, :kind :dependency}
   {:from :engine.compose, :to :engine.route, :kind :dependency}
   {:from :application.events, :to :engine.layout, :kind :dependency}
   {:from :adapters.sketch, :to :quil, :kind :dependency}
   {:from :engine.compose, :to :domain.geom, :kind :dependency}
+  {:from :main.ir-generator, :to :rust-language.graph-rust, :kind :dependency}
   {:from :engine.route, :to :engine.layout, :kind :dependency}
   {:from :domain.hierarchy, :to :domain.policy, :kind :dependency}
   {:from :adapters.draw, :to :domain.hierarchy, :kind :dependency}
@@ -71,6 +97,7 @@
   {:from :adapters.core, :to :adapters.sketch, :kind :dependency}
   {:from :engine.hit, :to :engine.layout, :kind :dependency}
   {:from :application.document, :to :domain.policy, :kind :dependency}
+  {:from :typescript-language.graph-typescript, :to :graph, :kind :implements}
   {:from :engine.hit, :to :domain.geom, :kind :dependency}
   {:from :adapters.draw, :to :domain.config, :kind :dependency}
   {:from :main.uml-viewer, :to :clojure-language.source-clojure, :kind :dependency}
@@ -93,124 +120,222 @@
   {:from :adapters.source-window, :to :javax.swing, :kind :dependency}
   {:from :adapters.sketch, :to :javax.swing, :kind :dependency}],
  :classes
- [{:id :adapters.core,
-   :name "Core",
+ [{:stereotype nil,
    :ns "uml-viewer.adapters.core",
-   :stereotype nil,
-   :level 3}
-  {:id :adapters.draw,
-   :name "Draw",
+   :name "Core",
+   :file "src/uml_viewer/adapters/core.clj",
+   :level 3,
+   :lang :clojure,
+   :id :adapters.core}
+  {:stereotype nil,
    :ns "uml-viewer.adapters.draw",
-   :stereotype nil,
-   :level 3}
-  {:id :adapters.sketch,
-   :name "Sketch",
+   :name "Draw",
+   :file "src/uml_viewer/adapters/draw.clj",
+   :level 3,
+   :lang :clojure,
+   :id :adapters.draw}
+  {:stereotype nil,
    :ns "uml-viewer.adapters.sketch",
-   :stereotype nil,
-   :level 3}
-  {:id :adapters.source-window,
-   :name "SourceWindow",
+   :name "Sketch",
+   :file "src/uml_viewer/adapters/sketch.clj",
+   :level 3,
+   :lang :clojure,
+   :id :adapters.sketch}
+  {:stereotype nil,
    :ns "uml-viewer.adapters.source-window",
-   :stereotype nil,
-   :level 3}
-  {:id :application.detail,
-   :name "Detail",
+   :name "SourceWindow",
+   :file "src/uml_viewer/adapters/source_window.clj",
+   :level 3,
+   :lang :clojure,
+   :id :adapters.source-window}
+  {:stereotype nil,
    :ns "uml-viewer.application.detail",
-   :stereotype nil,
-   :level 2}
-  {:id :application.document,
-   :name "Document",
+   :name "Detail",
+   :file "src/uml_viewer/application/detail.clj",
+   :level 2,
+   :lang :clojure,
+   :id :application.detail}
+  {:stereotype nil,
    :ns "uml-viewer.application.document",
-   :stereotype nil,
-   :level 2}
-  {:id :application.events,
-   :name "Events",
+   :name "Document",
+   :file "src/uml_viewer/application/document.clj",
+   :level 2,
+   :lang :clojure,
+   :id :application.document}
+  {:stereotype nil,
    :ns "uml-viewer.application.events",
-   :stereotype nil,
-   :level 2}
-  {:id :application.ir-generator,
-   :name "IrGenerator",
+   :name "Events",
+   :file "src/uml_viewer/application/events.clj",
+   :level 2,
+   :lang :clojure,
+   :id :application.events}
+  {:stereotype nil,
    :ns "uml-viewer.application.ir-generator",
-   :stereotype nil,
-   :level 2}
-  {:id :application.overlay,
-   :name "Overlay",
-   :ns "uml-viewer.application.overlay",
-   :stereotype nil,
-   :level 2}
-  {:id :clojure-language.graph-clojure,
-   :name "GraphClojure",
-   :ns "uml-viewer.clojure-language.graph-clojure",
-   :stereotype nil,
-   :level 0}
-  {:id :clojure-language.source-clojure,
-   :name "SourceClojure",
-   :ns "uml-viewer.clojure-language.source-clojure",
-   :stereotype nil,
-   :level 0}
-  {:id :domain.config,
-   :name "Config",
-   :ns "uml-viewer.domain.config",
-   :stereotype nil,
-   :level 0}
-  {:id :domain.geom,
-   :name "Geom",
-   :ns "uml-viewer.domain.geom",
-   :stereotype nil,
-   :level 0}
-  {:id :domain.hierarchy,
-   :name "Hierarchy",
-   :ns "uml-viewer.domain.hierarchy",
-   :stereotype nil,
-   :level 0}
-  {:id :domain.ir, :name "Ir", :ns "uml-viewer.domain.ir", :stereotype nil, :level 0}
-  {:id :domain.log, :name "Log", :ns "uml-viewer.domain.log", :stereotype nil, :level 0}
-  {:id :domain.mailbox,
-   :name "Mailbox",
-   :ns "uml-viewer.domain.mailbox",
-   :stereotype nil,
-   :level 0}
-  {:id :domain.policy,
-   :name "Policy",
-   :ns "uml-viewer.domain.policy",
-   :stereotype nil,
-   :level 0}
-  {:id :engine.compose,
-   :name "Compose",
-   :ns "uml-viewer.engine.compose",
-   :stereotype nil,
-   :level 1}
-  {:id :engine.curve,
-   :name "Curve",
-   :ns "uml-viewer.engine.curve",
-   :stereotype nil,
-   :level 1}
-  {:id :engine.hit, :name "Hit", :ns "uml-viewer.engine.hit", :stereotype nil, :level 1}
-  {:id :engine.layout,
-   :name "Layout",
-   :ns "uml-viewer.engine.layout",
-   :stereotype nil,
-   :level 1}
-  {:id :engine.route,
-   :name "Route",
-   :ns "uml-viewer.engine.route",
-   :stereotype nil,
-   :level 1}
-  {:id :graph, :name "Graph", :ns "uml-viewer.graph", :stereotype :interface, :level 0}
-  {:id :main.ir-generator,
    :name "IrGenerator",
+   :file "src/uml_viewer/application/ir_generator.clj",
+   :level 2,
+   :lang :clojure,
+   :id :application.ir-generator}
+  {:stereotype nil,
+   :ns "uml-viewer.application.overlay",
+   :name "Overlay",
+   :file "src/uml_viewer/application/overlay.clj",
+   :level 2,
+   :lang :clojure,
+   :id :application.overlay}
+  {:stereotype nil,
+   :ns "uml-viewer.clojure-language.graph-clojure",
+   :name "GraphClojure",
+   :file "src/uml_viewer/clojure_language/graph_clojure.clj",
+   :level 0,
+   :lang :clojure,
+   :id :clojure-language.graph-clojure}
+  {:stereotype nil,
+   :ns "uml-viewer.clojure-language.source-clojure",
+   :name "SourceClojure",
+   :file "src/uml_viewer/clojure_language/source_clojure.clj",
+   :level 0,
+   :lang :clojure,
+   :id :clojure-language.source-clojure}
+  {:stereotype nil,
+   :ns "uml-viewer.domain.config",
+   :name "Config",
+   :file "src/uml_viewer/domain/config.clj",
+   :level 0,
+   :lang :clojure,
+   :id :domain.config}
+  {:stereotype nil,
+   :ns "uml-viewer.domain.geom",
+   :name "Geom",
+   :file "src/uml_viewer/domain/geom.clj",
+   :level 0,
+   :lang :clojure,
+   :id :domain.geom}
+  {:stereotype nil,
+   :ns "uml-viewer.domain.hierarchy",
+   :name "Hierarchy",
+   :file "src/uml_viewer/domain/hierarchy.clj",
+   :level 0,
+   :lang :clojure,
+   :id :domain.hierarchy}
+  {:stereotype nil,
+   :ns "uml-viewer.domain.ir",
+   :name "Ir",
+   :file "src/uml_viewer/domain/ir.clj",
+   :level 0,
+   :lang :clojure,
+   :id :domain.ir}
+  {:stereotype nil,
+   :ns "uml-viewer.domain.log",
+   :name "Log",
+   :file "src/uml_viewer/domain/log.clj",
+   :level 0,
+   :lang :clojure,
+   :id :domain.log}
+  {:stereotype nil,
+   :ns "uml-viewer.domain.mailbox",
+   :name "Mailbox",
+   :file "src/uml_viewer/domain/mailbox.clj",
+   :level 0,
+   :lang :clojure,
+   :id :domain.mailbox}
+  {:stereotype nil,
+   :ns "uml-viewer.domain.policy",
+   :name "Policy",
+   :file "src/uml_viewer/domain/policy.clj",
+   :level 0,
+   :lang :clojure,
+   :id :domain.policy}
+  {:stereotype nil,
+   :ns "uml-viewer.engine.compose",
+   :name "Compose",
+   :file "src/uml_viewer/engine/compose.clj",
+   :level 1,
+   :lang :clojure,
+   :id :engine.compose}
+  {:stereotype nil,
+   :ns "uml-viewer.engine.curve",
+   :name "Curve",
+   :file "src/uml_viewer/engine/curve.clj",
+   :level 1,
+   :lang :clojure,
+   :id :engine.curve}
+  {:stereotype nil,
+   :ns "uml-viewer.engine.hit",
+   :name "Hit",
+   :file "src/uml_viewer/engine/hit.clj",
+   :level 1,
+   :lang :clojure,
+   :id :engine.hit}
+  {:stereotype nil,
+   :ns "uml-viewer.engine.layout",
+   :name "Layout",
+   :file "src/uml_viewer/engine/layout.clj",
+   :level 1,
+   :lang :clojure,
+   :id :engine.layout}
+  {:stereotype nil,
+   :ns "uml-viewer.engine.route",
+   :name "Route",
+   :file "src/uml_viewer/engine/route.clj",
+   :level 1,
+   :lang :clojure,
+   :id :engine.route}
+  {:stereotype :interface,
+   :ns "uml-viewer.graph",
+   :name "Graph",
+   :file "src/uml_viewer/graph.clj",
+   :level 0,
+   :lang :clojure,
+   :id :graph}
+  {:stereotype nil,
    :ns "uml-viewer.main.ir-generator",
-   :stereotype nil,
-   :level 4}
-  {:id :main.uml-viewer,
-   :name "UmlViewer",
+   :name "IrGenerator",
+   :file "src/uml_viewer/main/ir_generator.clj",
+   :level 4,
+   :lang :clojure,
+   :id :main.ir-generator}
+  {:stereotype nil,
    :ns "uml-viewer.main.uml-viewer",
-   :stereotype nil,
-   :level 4}
-  {:id :source,
-   :name "Source",
+   :name "UmlViewer",
+   :file "src/uml_viewer/main/uml_viewer.clj",
+   :level 4,
+   :lang :clojure,
+   :id :main.uml-viewer}
+  {:stereotype nil,
+   :ns "uml-viewer.rust-language.graph-rust",
+   :name "GraphRust",
+   :file "src/uml_viewer/rust_language/graph_rust.clj",
+   :level 0,
+   :lang :clojure,
+   :id :rust-language.graph-rust}
+  {:stereotype nil,
+   :ns "uml-viewer.rust-language.source-rust",
+   :name "SourceRust",
+   :file "src/uml_viewer/rust_language/source_rust.clj",
+   :level 0,
+   :lang :clojure,
+   :id :rust-language.source-rust}
+  {:stereotype :interface,
    :ns "uml-viewer.source",
-   :stereotype :interface,
-   :level 0}
+   :name "Source",
+   :file "src/uml_viewer/source.clj",
+   :level 0,
+   :lang :clojure,
+   :id :source}
+  {:stereotype nil,
+   :ns "uml-viewer.typescript-language.graph-typescript",
+   :name "GraphTypescript",
+   :file "src/uml_viewer/typescript_language/graph_typescript.clj",
+   :level 0,
+   :lang :clojure,
+   :id :typescript-language.graph-typescript}
+  {:stereotype nil,
+   :ns "uml-viewer.typescript-language.source-typescript",
+   :name "SourceTypescript",
+   :file "src/uml_viewer/typescript_language/source_typescript.clj",
+   :level 0,
+   :lang :clojure,
+   :id :typescript-language.source-typescript}
   {:id :javax.swing, :name "javax.swing", :foreign true}
   {:id :quil, :name "quil", :foreign true}]}

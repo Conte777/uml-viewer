@@ -1,9 +1,16 @@
 (ns uml-viewer.main.ir-generator
-  (:require [uml-viewer.clojure-language.graph-clojure :as clj-graph]
-            [uml-viewer.application.ir-generator :as ir-generator])
+  (:require [uml-viewer.application.ir-generator :as ir-generator]
+            [uml-viewer.clojure-language.graph-clojure]
+            [uml-viewer.graph :as graph]
+            [uml-viewer.rust-language.graph-rust]
+            [uml-viewer.typescript-language.graph-typescript])
   (:gen-class))
 
 (defn -main [& args]
-  (let [policy (or (first args) "examples/uml-viewer.policy.edn")
-        out (second args)]
-    (println "Wrote" (ir-generator/generate clj-graph/impl policy out))))
+  (let [policy-path (or (first args) "examples/uml-viewer.policy.edn")
+        out (second args)
+        policy (ir-generator/read-policy policy-path)
+        lang (or (:lang policy) :clojure)
+        impl (or (graph/lookup lang)
+                 (throw (ex-info (str "no LanguageGraph for " lang) {:lang lang})))]
+    (println "Wrote" (ir-generator/generate impl policy-path out))))

@@ -32,25 +32,36 @@
   (let [[out in] (get rel-phrases kind ["to" "from"])]
     (if outgoing? out in)))
 
+(defn member-ident
+  "Source-window identity for a class card. `member-name` may be nil."
+  ([model] (member-ident model nil))
+  ([model member-name]
+   (cond-> {:ns (:ns model)}
+     (seq (str member-name)) (assoc :name (str member-name))
+     (:lang model) (assoc :lang (:lang model))
+     (:file model) (assoc :file (:file model)))))
+
 (defn model
   "Class card for the detail window, or nil if `id` is unknown."
   [scene id]
   (when-let [c (hit/class-by-id scene id)]
-    {:class c
-     :ns (overlay/class-namespace c)
-     :package (hit/package-by-id scene (:package c))
-     :title (get-in scene [:diagram :title])
-     :rels (mapv (fn [e]
-                   (let [out? (= id (:from e))
-                         oid (if out? (:to e) (:from e))
-                         other (hit/class-by-id scene oid)]
-                     {:id oid
-                      :name (or (:name other) (name oid))
-                      :kind (:kind e)
-                      :label (:label e)
-                      :outgoing? out?
-                      :phrase (rel-phrase (:kind e) out?)}))
-                 (hit/connected-edges scene id))}))
+    (cond-> {:class c
+             :ns (overlay/class-namespace c)
+             :package (hit/package-by-id scene (:package c))
+             :title (get-in scene [:diagram :title])
+             :rels (mapv (fn [e]
+                           (let [out? (= id (:from e))
+                                 oid (if out? (:to e) (:from e))
+                                 other (hit/class-by-id scene oid)]
+                             {:id oid
+                              :name (or (:name other) (name oid))
+                              :kind (:kind e)
+                              :label (:label e)
+                              :outgoing? out?
+                              :phrase (rel-phrase (:kind e) out?)}))
+                         (hit/connected-edges scene id))}
+      (:lang c) (assoc :lang (:lang c))
+      (:file c) (assoc :file (:file c)))))
 
 (defn column-layout
   "Columns from the right edge. Each has :left and :right."

@@ -43,6 +43,17 @@
        "   diagram above Proposals to return to the namespace tree. If instructed,\n"
        "   add a named proposal to :proposals in the policy (default name is a\n"
        "   timestamp) and regenerate the IR.\n"
+       "TypeScript and Rust are scanners beside Clojure. A Clojure project keeps\n"
+       ":lang :clojure (the default) and the CRAP and mutation steps below.\n"
+       "Another language sets :lang. More than one language sets :sources, each\n"
+       "entry {:lang :root :prefix?}. The policy :prefix is stripped to make\n"
+       "ids. A source :prefix is that tree's namespace root, for example\n"
+       "bookwriter.rust beside TypeScript modules under bookwriter. Dots in the\n"
+       "module id are still the tree. Do not invent packages. A TypeScript\n"
+       "invoke(\"name\") depends on the Rust #[tauri::command] of that name.\n"
+       "For a non-Clojure language, run that language's CRAP and mutation tools\n"
+       "when they exist. Snapshots are keyed by the class :ns. Then regenerate\n"
+       "the IR.\n"
        "2. Run clj -M:crap.\n"
        "3. Run clj -M:mutate on each changed file under src/ (differential).\n"
        "   Uncovered mutants are coverage gaps: keep the snapshot; do not\n"
@@ -491,11 +502,11 @@
           rows (detail/rows model)]
       (cond
         (detail/module-at rows y)
-        (source-window/open-member-window! (:source @!bridge) {:ns (:ns model)})
+        (source-window/open-member-window! (:source @!bridge) (detail/member-ident model))
 
         (detail/member-at rows y)
-        (source-window/open-member-window! (:source @!bridge) (:ns model)
-                                           (detail/member-at rows y))
+        (source-window/open-member-window! (:source @!bridge)
+                                           (detail/member-ident model (detail/member-at rows y)))
 
         (detail/rel-at rows y)
         (swap! !bridge assoc :pick (detail/rel-at rows y)))))

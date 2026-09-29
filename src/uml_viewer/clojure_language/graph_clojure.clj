@@ -146,6 +146,8 @@
         {:id id
          :name (class-name id)
          :ns ns-str
+         :lang :clojure
+         :file (graph/relative-path file)
          :stereotype (when (interface? forms) :interface)
          :requires (->> libs
                         (map symbol)

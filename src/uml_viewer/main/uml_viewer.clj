@@ -1,7 +1,9 @@
 (ns uml-viewer.main.uml-viewer
   (:require [uml-viewer.adapters.core :as core]
             [uml-viewer.clojure-language.source-clojure :as clj-source]
-            [uml-viewer.domain.log :as log])
+            [uml-viewer.domain.log :as log]
+            [uml-viewer.rust-language.source-rust]
+            [uml-viewer.typescript-language.source-typescript])
   (:gen-class))
 
 (defn -main [& args]

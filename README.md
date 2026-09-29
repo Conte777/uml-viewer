@@ -23,7 +23,8 @@ You choose architectural levels by telling the agent what coupling and
 cohesion criteria to use. For example, I tell my agent to group modules
 into components by the Common Closure Principle.
 
-Dependencies that point from higher to lower level components are colored red in conformance to the Dependency Rule of Clean Architecture.
+Dependencies that point from a higher level to a lower level are colored
+red, in accordance with the Dependency Rule of Clean Architecture.
 
 The bottom line: you can view the structure of your code, see how well
 tests cover it, play what-if games, and manipulate the system from a high
@@ -36,11 +37,11 @@ a language-specific parser write the topology; this tool displays it, routes
 the arrows, colors CRAP, and lets you click.
 
 The IR is **topology**: the namespace tree, classes, and edges. **Metrics**
-(CC, coverage, CRAP, killed/survived/uncovered) come from `.metrics/` snapshots produced
-by [crap4clj](https://github.com/unclebob/crap4clj) and
-[clj-mutate](https://github.com/unclebob/clj-mutate). The viewer overlays those
-files at load, keyed by namespace + function name. Agents edit the policy, not
-the IR. See [Policy](#policy).
+(CC, coverage, CRAP, killed/survived/uncovered) come from `.metrics/`
+snapshots produced by [crap4clj](https://github.com/unclebob/crap4clj) and
+[clj-mutate](https://github.com/unclebob/clj-mutate). The viewer overlays
+those files at load, keyed by namespace and function name. Agents edit the
+policy, not the IR. See [Policy](#policy).
 
 ## Run
 
@@ -183,13 +184,16 @@ Rename or move of a function is a new form: overlay does not match old names.
 This project's diagram is **generated**. Do not edit `examples/uml-viewer.edn`.
 Edit `examples/uml-viewer.policy.edn`, then run `clj -M:ir` (or press Regen).
 
-The **parser** (`LanguageGraph`) reads source and emits facts: one class per
-project namespace, `:require` / `:use` of another project ns as
-`:dependency`, `requiring-resolve` of a quoted var as `:dependency` on that
-var's namespace, `defprotocol` as `:stereotype :interface`, `defrecord` /
-`deftype` of a protocol as `:implements`. External `:require`s and `:import`s
-become **foreign** classes. Members are not authored — overlay fills them from
-`.metrics/`.
+The **parser** (`LanguageGraph`) reads source and emits facts. Clojure is
+one class per namespace. A `:require` or `:use` of another project
+namespace is a `:dependency`. `requiring-resolve` of a quoted var is a
+`:dependency` on that var's namespace. `defprotocol` is
+`:stereotype :interface`. `defrecord` or `deftype` of a protocol is
+`:implements`. External `:require`s and `:import`s become **foreign**
+classes. The overlay fills Clojure members from `.metrics/`. TypeScript
+and Rust are separate scanners (see
+[Language graphs](#language-graphs)): one class per module, with exported
+members as `:ops`. The overlay keys every language by `:ns`.
 
 ### Do not invent layers (components)
 
@@ -203,8 +207,10 @@ namespaces. To **view** a grouping that is not in the code, use `:proposals`
 
 To write a policy for a project:
 
-1. Set `:src` and `:prefix` to the project's source root and ns prefix
-   (`src` and `foo` for `foo.bar.baz`).
+1. Set `:prefix` to the namespace prefix (`foo` for `foo.bar.baz`). A
+   single language also sets `:src` (default `src`) and `:lang` when the
+   language is not Clojure. More than one language sets `:sources`
+   instead of `:src`.
 2. Set `:hierarchical true` (or omit `:packages` and `:diagrams`).
 3. List top-level **segments** in `:order` — the first dotted part after
    the prefix, in the order you want the boxes. Do not invent names.
@@ -219,9 +225,12 @@ To write a policy for a project:
 8. Run `clj -M:ir` (or Regen).
 
 If `foo.bar` and `foo.bar.baz` both exist, the `bar` box lists `bar` (the
-module) and `baz` (the child). Module titles are the last ns segment
-(`layout`, not `engine.layout`). Double-click the component to open that
-level; double-click the `bar` module line for its class card.
+module) and `baz` (the child). Module titles are the last namespace
+segment (`layout`, not `engine.layout`). A hyphenated segment capitalizes
+each part (`source-clojure` → `SourceClojure`). A segment that already
+contains a capital keeps that spelling and capitalizes the first letter
+(`tauriFs` → `TauriFs`). Double-click the component to open that level;
+double-click the `bar` module line for its class card.
 
 Wrong (invented partitions):
 
@@ -240,13 +249,29 @@ Right (the ns tree):
  :out "examples/uml-viewer.edn"
  :hierarchical true
  :foreign [quil]
- :order [main adapters application engine source graph clojure-language domain]
- :levels [[domain source graph clojure-language]
+ :order [main adapters application engine source graph
+         clojure-language typescript-language rust-language domain]
+ :levels [[domain source graph clojure-language typescript-language rust-language]
           [engine]
           [application]
           [adapters]
           [main]]
  :edge-kinds {[:engine.compose :engine.layout] :association}}
+```
+
+A project with more than one language lists each tree under `:sources`.
+The policy `:prefix` is stripped from ids. A source `:prefix` is that
+tree's namespace root. `src/model.ts` becomes `bookwriter.model`
+(`:model`). `src-tauri/src/lib.rs` becomes `bookwriter.rust` (`:rust`).
+`main.rs` becomes `bookwriter.rust.main` (`:rust.main`).
+
+```edn
+{:title "Bookwriter"
+ :prefix "bookwriter"
+ :sources [{:lang :typescript :root "src"}
+           {:lang :rust :root "src-tauri/src" :prefix "bookwriter.rust"}]
+ :foreign [at.tauri-apps markdown-it highlight.js node tauri serde std]
+ :hierarchical true}
 ```
 
 | Key | Role |
@@ -259,18 +284,27 @@ Right (the ns tree):
 | `:omit` | On a proposal or the policy: nses (and their children) left off the diagram |
 | `:edge-kinds` | Override parser kind for `[from to]` (usually `:association`) |
 | `:omit-edges` | Drop `[from to]` |
-| `:lang` | Which `LanguageGraph` to use (default `:clojure`) |
-| `:foreign` | External libs as ovals. A listed prefix collapses `quil.core` to `quil`. |
+| `:lang` | Scanner when `:sources` is absent (default `:clojure`) |
+| `:src` | Source root when `:sources` is absent |
+| `:sources` | One scan per `{:lang :root :prefix?}`. The entry `:prefix` is that tree's namespace root |
+| `:foreign` | External libs as ovals. A listed prefix collapses `quil.core` to `quil`. Unlisted externals are dropped |
 
 **Viewer Grok loop** (passed with `--rules` to the companion session only)
 
 On launch: from the examined directory, write or update the hierarchical
 policy and regenerate the IR, then wait.
 
-After **every** later source or policy change: `clj -M:crap`, `clj -M:mutate`
-on the changed `src/` files, then `clj -M:ir`. Uncovered mutants remaining are
-coverage gaps; keep the snapshot and do not re-run the file or force a full
-mutation because mutate exited non-zero.
+After **every** later source or policy change, refresh metrics and
+regenerate the IR.
+
+For Clojure that is `clj -M:crap`, then `clj -M:mutate` on the changed
+`src/` files, then `clj -M:ir`. Uncovered mutants that remain are coverage
+gaps. Keep the snapshot. Do not re-run the file or force a full mutation
+because mutate exited non-zero.
+
+For another language, run that language's CRAP and mutation tools when
+they exist. The overlay keys every snapshot by the class `:ns`. Missing
+CRAP or mutation data is red. Then regenerate the IR.
 
 - Add/rename/delete a namespace: the tree updates on `clj -M:ir`. Put a new
   top-level **segment** in `:order` if you care about box order.
@@ -337,8 +371,9 @@ A component inherits the **max** level of its elements.
 Class boxes show the current view's rank (innermost **0**)
 at the upper left; the class card repeats **Level n**. Level 0 is drawn at
 the **bottom**. Good arrows (outer → inner) point down; violating arrows
-(inner → outer) point up and stay red. When arrows are collapsed, selecting a class highlights
-the component arrows it belongs to. Collapsed components keep their color
+(inner → outer) point up and stay red. When arrows are collapsed,
+selecting a class highlights the component arrows it belongs to.
+Collapsed components keep their color
 and C/M dots; double-click still opens a component.
 
 ```edn
@@ -409,23 +444,62 @@ inspector says the session is not attached.
 ## Language graphs
 
 Generating the IR asks `uml-viewer.graph` to scan a source tree. `:lang`
-selects the scanner (default `:clojure`). Register another implementation
-with `(graph/register! :java my-java-scanner)`. The scanner must satisfy
+selects the scanner (default `:clojure`). `:sources` scans each root and
+merges them. Register another implementation with
+`(graph/register! :java my-java-scanner)`. The scanner must satisfy
 `LanguageGraph`:
 
 | method | role |
 |--------|------|
-| `scan` | from a root directory and `{:prefix …}`, return `{:classes :edges}` |
+| `scan` | From a root and `{:prefix :ns-prefix?}`, return `{:classes :edges}` |
 
-Classes are `{:id :name :ns :stereotype}`. Edges are `{:from :to :kind}`
-(`:dependency` or `:implements`). The policy layer is language-neutral.
+`:commands` and `:invokes` are optional. `merge-scans` turns a matching
+command name into a `:dependency` and does not copy those keys onto a
+class.
 
-**Clojure** (`uml-viewer.clojure-language.graph-clojure`) is the only
-implementation today: it reads `ns` forms (including prefix lists),
-`requiring-resolve` of a quoted var (including nested calls), `defprotocol`,
-`defrecord`, and `deftype`. Java or C need a different parser; do not
-special-case languages in `policy` or `ir-generator`. Main constructs the
-implementation and passes it in.
+Classes are `{:id :name :ns :stereotype :lang :file}`. Edges are
+`{:from :to :kind}` (`:dependency` or `:implements`). The policy layer is
+language-neutral. Do not special-case a language in `policy`. Main
+requires each scanner so it registers; `ir-generator` looks the scanner
+up.
+
+**Clojure** (`uml-viewer.clojure-language.graph-clojure`) reads `ns` forms
+(including prefix lists), `requiring-resolve` of a quoted var (including
+nested calls), `defprotocol`, `defrecord`, and `deftype`. It does not emit
+`:ops`. Project classes carry `:lang :clojure` and `:file`.
+
+**TypeScript** (`uml-viewer.typescript-language.graph-typescript`) emits
+one class per module file (`.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`).
+It skips `*.test.*`, `*.spec.*`, `*.d.ts`, and paths under `node_modules`,
+`dist`, and `target`. A relative import is a dependency, and `import type`
+counts. An asset import (CSS, images, JSON, and the like) is ignored. A
+bare specifier is foreign: `@tauri-apps/api/core` becomes
+`:at.tauri-apps.api.core`. A listed `:foreign` prefix such as
+`at.tauri-apps` collapses that id. `export function f(): T` and
+`export const x: T` are `:implements` when `T` is an imported project
+name. `Promise<Book>` and `TreeNode[]` are not. A module that exports an
+interface and no values is `:stereotype :interface`. Exported functions,
+constants, classes, and enums are `:ops`. `invoke("name")` is recorded
+for the cross-language link.
+
+**Rust** (`uml-viewer.rust-language.graph-rust`) walks the modules
+reachable from `lib.rs` and `main.rs` through `mod`. The `[lib] name` in
+`Cargo.toml` is the crate name, so `bookwriter_lib::run()` in `main.rs`
+depends on the lib class. `pub fn` functions are `:ops`. `pub(crate)`
+functions are not, unless they are `#[tauri::command]` functions, which
+are `:ops` even when private. `impl Trait for Type` is `:implements` when
+the trait resolves to a project module. The first segment of a `use`,
+other than `crate`, `self`, `super`, or the lib crate, is a foreign
+crate.
+
+`merge-scans` links a TypeScript `invoke("read_text")` to the Rust class
+that owns `#[tauri::command] fn read_text`, as a `:dependency`. Two
+project classes with the same id are an error. When a dependency and an
+`:implements` edge join the same pair, the IR keeps `:implements`.
+
+CRAP and mutation for TypeScript and Rust come from separate tools. The
+overlay keys those snapshots by the class `:ns`, as it does for Clojure.
+A class with no CRAP or mutation data is red.
 
 ## IR
 
@@ -435,9 +509,9 @@ at the current drill level. A hand-written IR with `:packages` (or
 `:diagrams`) is still a static diagram, e.g. `examples/library.edn`.
 
 Metrics on the class card do not have to be authored. If `.metrics/` is
-present, the overlay fills CC, coverage, CRAP, killed/survived/uncovered, and any
-functions found in the snapshots (including privates). Authored `:crap` /
-`:coverage` / `:ops` are the fallback when no snapshot exists.
+present, the overlay fills CC, coverage, CRAP, killed/survived/uncovered,
+and any functions found in the snapshots (including privates). Authored
+`:crap` / `:coverage` / `:ops` are the fallback when no snapshot exists.
 
 Overlay keys snapshots by class `:ns` (the real source namespace). The
 generator writes `:ns` from the scanned ns. Hand-written IR must set `:ns`
@@ -537,14 +611,17 @@ extractor must satisfy `LanguageSource`:
 | `extract` | slice that member out of the file text |
 | `title` | window title |
 
-**Clojure** (`uml-viewer.clojure-language.source-clojure`) is the only
-implementation today: it maps `:ns` to `src/...clj` (or `.cljc` / `.cljs`)
-and finds the top-level `(defn name …)` / `(defn- name …)` so the window can
-jump to that line. That locate/line step is not enough for Java or C — those
-need a parser or language server, and a richer identity (`:class`,
-`:signature`, `:file`). The protocol is the seam; do not special-case
-languages in the class card. Main constructs the extractor and passes it to
-Core.
+**Clojure** (`uml-viewer.clojure-language.source-clojure`) maps `:ns` to
+`src/...clj` (or `.cljc` / `.cljs`) and finds the top-level `(defn name …)` /
+`(defn- name …)` so the window can jump to that line. It does not read
+`:file`.
+
+**TypeScript** (`uml-viewer.typescript-language.source-typescript`) and
+**Rust** (`uml-viewer.rust-language.source-rust`) open `:file` and find
+the exported declaration or the `fn`. The class card passes `:lang` and
+`:file` from the class. A class with no `:lang` still uses the Clojure
+extractor that Main passes in. The protocol is the seam; do not
+special-case languages in the class card.
 
 Quil stays in `adapters.draw` and `adapters.sketch`. The rest of the engine
 does not depend on Processing.

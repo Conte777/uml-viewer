@@ -35,9 +35,15 @@
         id
         (join-id (take (inc n) s))))))
 
+(defn- label-part [part]
+  (if (and (seq part) (re-find #"[A-Z]" part))
+    (str (str/upper-case (subs part 0 1)) (subs part 1))
+    (str/capitalize part)))
+
 (defn- node-label [id]
-  (->> (str/split (name (last-seg id)) #"\-")
-       (map str/capitalize)
+  (->> (str/split (name (last-seg id)) #"-")
+       (remove str/blank?)
+       (map label-part)
        (str/join)))
 
 (defn- module-name
@@ -128,6 +134,8 @@
              :name (node-label id)
              :drill? drill?}
       (:ns leaf) (assoc :ns (:ns leaf))
+      (:lang leaf) (assoc :lang (:lang leaf))
+      (:file leaf) (assoc :file (:file leaf))
       (some? lv) (assoc :level lv)
       (:stereotype leaf) (assoc :stereotype (:stereotype leaf))
       crap (assoc :crap crap)

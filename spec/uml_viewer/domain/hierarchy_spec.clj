@@ -428,6 +428,13 @@
       (should= "Layout" (:name (first (filter #(= :engine.layout (:id %))
                                               (:contents engine)))))))
 
+  (it "keeps a capital already present in a module name"
+    (let [g {:classes [{:id :tauriFs :name "ignored" :ns "bookwriter.tauriFs"}]
+             :edges []}
+          doc (policy/apply-policy {:title "Demo" :hierarchical true} g)
+          box (first (mapcat :classes (:packages (hierarchy/view-at doc []))))]
+      (should= "TauriFs" (:name box))))
+
   (it "keeps arrows between classes in the same view"
     (let [g {:classes [{:id :engine :name "Engine" :ns "demo.engine"}
                        {:id :engine.layout :name "Layout" :ns "demo.engine.layout"}

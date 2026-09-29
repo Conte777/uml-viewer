@@ -124,7 +124,8 @@
   `source-impl` satisfies `LanguageSource`. `ident` is a source identity
   map, or `ns-name` plus `member-name`."
   ([source-impl ident]
-   (when-let [{:keys [title body line]} (source/member-source source-impl ident)]
+   (when-let [{:keys [title body line]}
+              (source/member-source (if (:lang ident) (:lang ident) source-impl) ident)]
      (SwingUtilities/invokeLater
        (fn []
          (build-frame! title body line)))

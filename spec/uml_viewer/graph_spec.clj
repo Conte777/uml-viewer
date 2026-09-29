@@ -108,6 +108,8 @@
           by-id (into {} (map (juxt :id identity) (:classes g)))
           edges (set (map (juxt :from :to :kind) (:edges g)))]
       (should= :interface (:stereotype (by-id :source)))
+      (should= :clojure (:lang (by-id :source)))
+      (should= "src/uml_viewer/source.clj" (:file (by-id :source)))
       (should= "SourceClojure"
                (:name (by-id :clojure-language.source-clojure)))
       (should (contains? edges [:clojure-language.source-clojure :source :implements]))

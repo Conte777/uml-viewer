@@ -2,8 +2,8 @@
   (:require [clojure.edn :as edn]
             [clojure.pprint :as pprint]
             [clojure.string :as str]
-            [uml-viewer.graph :as graph]
-            [uml-viewer.domain.policy :as policy]))
+            [uml-viewer.domain.policy :as policy]
+            [uml-viewer.graph :as graph]))
 
 (defn read-policy [path]
   (edn/read-string (slurp path)))
@@ -16,22 +16,42 @@
                  pprint/*print-right-margin* 90]
          (with-out-str (pprint/pprint doc)))))
 
-(defn document
-  "Scan source with `graph-impl` and apply `policy`. Returns the IR document."
+(defn- scan-source
+  "One `:sources` entry. `:prefix` on the entry is that tree's namespace
+  root; the policy `:prefix` is what `id-of` strips."
+  [policy source]
+  (let [lang (keyword (or (:lang source) (:lang policy) :clojure))
+        impl (or (graph/lookup lang)
+                 (throw (ex-info (str "no LanguageGraph for " lang) {:lang lang})))]
+    (graph/scan impl
+                (or (:root source) (:src source) (:src policy) "src")
+                {:prefix (or (:prefix policy) "uml-viewer")
+                 :ns-prefix (or (:prefix source) (:prefix policy) "uml-viewer")
+                 :lang lang})))
+
+(defn scan-policy
+  "Scan `policy`. `:sources` merges one scanner per entry.
+  Otherwise `graph-impl` scans `:src` with the policy prefix."
   [graph-impl policy]
-  (let [root (or (:src policy) "src")
-        opts {:prefix (or (:prefix policy) "uml-viewer")}
-        graph (graph/scan graph-impl root opts)]
-    (policy/apply-policy policy graph)))
+  (if (seq (:sources policy))
+    (graph/merge-scans (mapv #(scan-source policy %) (:sources policy)))
+    (graph/scan graph-impl
+                (or (:src policy) "src")
+                {:prefix (or (:prefix policy) "uml-viewer")})))
+
+(defn document
+  "Scan source with `graph-impl` and apply `policy`. Returns the IR document.
+  A policy with `:sources` selects each scanner itself."
+  [graph-impl policy]
+  (policy/apply-policy policy (scan-policy graph-impl policy)))
 
 (defn generate
-  "Write the IR document for `policy-path` using `graph-impl`. Returns the output path."
+  "Write the IR document for `policy-path` using `graph-impl`. Returns the output path.
+  A policy with `:sources` selects each scanner itself."
   ([graph-impl policy-path] (generate graph-impl policy-path nil))
   ([graph-impl policy-path out-path]
    (let [policy (read-policy policy-path)
-         graph (graph/scan graph-impl
-                           (or (:src policy) "src")
-                           {:prefix (or (:prefix policy) "uml-viewer")})
+         graph (scan-policy graph-impl policy)
          extra (policy/unassigned policy graph)
          doc (assoc (policy/apply-policy policy graph)
                :policy-file policy-path)
