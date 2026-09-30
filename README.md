@@ -190,8 +190,8 @@ namespace is a `:dependency`. `requiring-resolve` of a quoted var is a
 `:dependency` on that var's namespace. `defprotocol` is
 `:stereotype :interface`. `defrecord` or `deftype` of a protocol is
 `:implements`. External `:require`s and `:import`s become **foreign**
-classes. The overlay fills Clojure members from `.metrics/`. TypeScript
-and Rust are separate scanners (see
+classes. The overlay fills Clojure members from `.metrics/`. TypeScript,
+Rust, and Python are separate scanners (see
 [Language graphs](#language-graphs)): one class per module, with exported
 members as `:ops`. The overlay keys every language by `:ns`.
 
@@ -250,8 +250,10 @@ Right (the ns tree):
  :hierarchical true
  :foreign [quil]
  :order [main adapters application engine source graph
-         clojure-language typescript-language rust-language domain]
- :levels [[domain source graph clojure-language typescript-language rust-language]
+         clojure-language typescript-language rust-language python-language
+         domain]
+ :levels [[domain source graph clojure-language typescript-language
+           rust-language python-language]
           [engine]
           [application]
           [adapters]
@@ -492,13 +494,33 @@ the trait resolves to a project module. The first segment of a `use`,
 other than `crate`, `self`, `super`, or the lib crate, is a foreign
 crate.
 
+**Python** (`uml-viewer.python-language.graph-python`) emits one class per
+`.py` module. `__init__.py` is the package. Point `:src` at the package
+directory or at its parent. A path that already begins with the
+prefix stays as written, so `src/tools/parse.py` and
+`src/tools/__init__.py` become `tools.parse` (`:parse`) and `tools`
+(`:tools`). It skips `test_*.py`, `*_test.py`, `*_tests.py`,
+`conftest.py`, and paths under `__pycache__`, `tests`, virtualenvs,
+`dist`, and `build`. `import` and
+`from ... import` are dependencies, including an import nested in a
+function. A relative import (`from . import`, `from ..mod import`) stays
+inside the package. A name that is not a project module is foreign
+(`os.path` stays `os.path`, and a listed `:foreign` prefix such as `os`
+collapses it). `class Dog(Animal)` is `:inheritance` when `Animal` is a
+project module. A base of `Protocol` or `ABC` is `:implements`.
+`def load() -> Animal` is `:implements` when `Animal` is a bare imported
+project name. `list[Animal]` is not. Public module-level functions and
+classes are `:ops`. A module whose public classes are only `Protocol` or
+`ABC` bases, with no public functions, is `:stereotype :interface`.
+
 `merge-scans` links a TypeScript `invoke("read_text")` to the Rust class
 that owns `#[tauri::command] fn read_text`, as a `:dependency`. Two
 project classes with the same id are an error. When a dependency and an
 `:implements` edge join the same pair, the IR keeps `:implements`.
 
-CRAP and mutation for TypeScript and Rust come from separate tools. The
-overlay keys those snapshots by the class `:ns`, as it does for Clojure.
+CRAP and mutation for TypeScript, Rust, and Python come from separate
+tools. The overlay keys those snapshots by the class `:ns`, as it does
+for Clojure.
 A class with no CRAP or mutation data is red.
 
 ## IR
@@ -616,12 +638,13 @@ extractor must satisfy `LanguageSource`:
 `(defn- name …)` so the window can jump to that line. It does not read
 `:file`.
 
-**TypeScript** (`uml-viewer.typescript-language.source-typescript`) and
-**Rust** (`uml-viewer.rust-language.source-rust`) open `:file` and find
-the exported declaration or the `fn`. The class card passes `:lang` and
-`:file` from the class. A class with no `:lang` still uses the Clojure
-extractor that Main passes in. The protocol is the seam; do not
-special-case languages in the class card.
+**TypeScript** (`uml-viewer.typescript-language.source-typescript`),
+**Rust** (`uml-viewer.rust-language.source-rust`), and **Python**
+(`uml-viewer.python-language.source-python`) open `:file` and find the
+exported declaration, the `fn`, or the `def`. The class card passes
+`:lang` and `:file` from the class. A class with no `:lang` still uses
+the Clojure extractor that Main passes in. The protocol is the seam; do
+not special-case languages in the class card.
 
 Quil stays in `adapters.draw` and `adapters.sketch`. The rest of the engine
 does not depend on Processing.

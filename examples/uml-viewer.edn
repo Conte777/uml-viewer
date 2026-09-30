@@ -10,6 +10,7 @@
   [:main.uml-viewer :rust-language.source-rust] :association,
   [:application.document :engine.compose] :association,
   [:main.uml-viewer :typescript-language.source-typescript] :association,
+  [:main :python-language] :association,
   [:engine.compose :engine.layout] :association,
   [:engine.compose :engine.route] :association,
   [:main.ir-generator :rust-language.graph-rust] :association,
@@ -18,12 +19,20 @@
   [:main.uml-viewer :clojure-language.source-clojure] :association,
   [:main :clojure-language] :association,
   [:main.ir-generator :application.ir-generator] :association,
+  [:main.uml-viewer :python-language.source-python] :association,
   [:main :adapters] :association,
   [:main :rust-language] :association,
+  [:main.ir-generator :python-language.graph-python] :association,
   [:main :typescript-language] :association},
  :omit-edges [],
  :levels
- [[:domain :source :graph :clojure-language :typescript-language :rust-language]
+ [[:domain
+   :source
+   :graph
+   :clojure-language
+   :typescript-language
+   :rust-language
+   :python-language]
   [:engine]
   [:application]
   [:adapters]
@@ -39,6 +48,7 @@
   :clojure-language
   :typescript-language
   :rust-language
+  :python-language
   :domain],
  :omit [],
  :edges
@@ -60,6 +70,7 @@
   {:from :rust-language.graph-rust, :to :graph, :kind :implements}
   {:from :application.detail, :to :application.overlay, :kind :dependency}
   {:from :engine.layout, :to :domain.geom, :kind :dependency}
+  {:from :python-language.graph-python, :to :graph, :kind :implements}
   {:from :main.uml-viewer, :to :rust-language.source-rust, :kind :dependency}
   {:from :adapters.sketch, :to :application.events, :kind :dependency}
   {:from :application.document, :to :engine.compose, :kind :dependency}
@@ -102,6 +113,7 @@
   {:from :adapters.draw, :to :domain.config, :kind :dependency}
   {:from :main.uml-viewer, :to :clojure-language.source-clojure, :kind :dependency}
   {:from :engine.curve, :to :domain.geom, :kind :dependency}
+  {:from :python-language.source-python, :to :source, :kind :implements}
   {:from :engine.layout, :to :domain.config, :kind :dependency}
   {:from :engine.compose, :to :engine.curve, :kind :dependency}
   {:from :adapters.draw, :to :engine.layout, :kind :dependency}
@@ -109,7 +121,9 @@
   {:from :application.overlay, :to :domain.ir, :kind :dependency}
   {:from :main.ir-generator, :to :application.ir-generator, :kind :dependency}
   {:from :adapters.sketch, :to :domain.policy, :kind :dependency}
+  {:from :main.uml-viewer, :to :python-language.source-python, :kind :dependency}
   {:from :adapters.sketch, :to :application.detail, :kind :dependency}
+  {:from :main.ir-generator, :to :python-language.graph-python, :kind :dependency}
   {:from :adapters.sketch, :to :application.document, :kind :dependency}
   {:from :application.events, :to :application.overlay, :kind :dependency}
   {:from :application.events, :to :engine.hit, :kind :dependency}
@@ -302,6 +316,20 @@
    :level 4,
    :lang :clojure,
    :id :main.uml-viewer}
+  {:stereotype nil,
+   :ns "uml-viewer.python-language.graph-python",
+   :name "GraphPython",
+   :file "src/uml_viewer/python_language/graph_python.clj",
+   :level 0,
+   :lang :clojure,
+   :id :python-language.graph-python}
+  {:stereotype nil,
+   :ns "uml-viewer.python-language.source-python",
+   :name "SourcePython",
+   :file "src/uml_viewer/python_language/source_python.clj",
+   :level 0,
+   :lang :clojure,
+   :id :python-language.source-python}
   {:stereotype nil,
    :ns "uml-viewer.rust-language.graph-rust",
    :name "GraphRust",
