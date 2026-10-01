@@ -139,4 +139,47 @@
           (should-not= a (overlay/metrics-stamp root)))
         (finally
           (doseq [f (reverse (file-seq (io/file root)))]
-            (io/delete-file f true)))))))
+            (io/delete-file f true))))))
+
+  (it "joins module and crate snapshots onto the prefixed class ns"
+    (let [doc {:hierarchical true
+               :prefix "bookwriter"
+               :classes [{:id :model :name "Model" :ns "bookwriter.model" :lang :typescript}
+                         {:id :pdf :name "Pdf" :ns "bookwriter.pdf" :lang :typescript}
+                         {:id :rust :name "Rust" :ns "bookwriter.rust" :lang :rust
+                          :file "src-tauri/src/lib.rs"}
+                         {:id :rust.main :name "Main" :ns "bookwriter.rust.main" :lang :rust
+                          :file "src-tauri/src/main.rs"}]
+               :edges []}
+          metrics {:crap {"model" [{:name "slugify" :namespace "model"
+                                    :complexity 2 :coverage 100.0 :crap 2.0}]
+                          "pdf" [{:name "styled" :namespace "pdf"
+                                  :complexity 4 :coverage 100.0 :crap 4.0}]
+                          "pdf.Layout" [{:name "figure" :namespace "pdf.Layout"
+                                         :complexity 8 :coverage 100.0 :crap 8.0}]
+                          "bookwriter" [{:name "read_text" :namespace "bookwriter"
+                                         :complexity 1 :coverage 100.0 :crap 1.0}
+                                        {:name "main" :namespace "bookwriter"
+                                         :complexity 1 :coverage 0.0 :crap 2.0}]
+                          "bookwriter::build" [{:name "main" :namespace "bookwriter::build"
+                                                :complexity 1 :coverage nil :crap nil}]}
+                   :mutate {"model" {:namespace "model"
+                                     :forms [{:id "defn/slugify" :killed 1 :survived 0
+                                              :uncovered 0 :sites 1}]}}}
+          painted (overlay/apply-metrics doc metrics)
+          by-id (into {} (map (juxt :id identity) (:classes painted)))
+          model (:model by-id)
+          pdf (:pdf by-id)
+          rust (:rust by-id)
+          main (:rust.main by-id)]
+      (should= 2 (:cc model))
+      (should= 1 (:killed model))
+      (should= 1 (:sites model))
+      (should (some #(= "slugify" (:name %)) (:ops model)))
+      (should= 12 (:cc pdf))
+      (should (some #(= "figure" (:name %)) (:ops pdf)))
+      (should (some #(= "read_text" (:name %)) (:ops rust)))
+      (should= 2 (:cc rust))
+      (should= 2 (count (:ops rust)))
+      (should-not (:crap main))
+      (should-not (some #(= "main" (:name %)) (:ops main))))))

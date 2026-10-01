@@ -193,7 +193,8 @@ namespace is a `:dependency`. `requiring-resolve` of a quoted var is a
 classes. The overlay fills Clojure members from `.metrics/`. TypeScript,
 Rust, and Python are separate scanners (see
 [Language graphs](#language-graphs)): one class per module, with exported
-members as `:ops`. The overlay keys every language by `:ns`.
+members as `:ops`. The overlay joins each snapshot by `:ns`, then by
+the class id.
 
 ### Do not invent layers (components)
 
@@ -305,8 +306,8 @@ gaps. Keep the snapshot. Do not re-run the file or force a full mutation
 because mutate exited non-zero.
 
 For another language, run that language's CRAP and mutation tools when
-they exist. The overlay keys every snapshot by the class `:ns`. Missing
-CRAP or mutation data is red. Then regenerate the IR.
+they exist. The overlay joins each snapshot by `:ns`, then by the class
+id. Missing CRAP or mutation data is red. Then regenerate the IR.
 
 - Add/rename/delete a namespace: the tree updates on `clj -M:ir`. Put a new
   top-level **segment** in `:order` if you care about box order.
@@ -519,9 +520,11 @@ project classes with the same id are an error. When a dependency and an
 `:implements` edge join the same pair, the IR keeps `:implements`.
 
 CRAP and mutation for TypeScript, Rust, and Python come from separate
-tools. The overlay keys those snapshots by the class `:ns`, as it does
-for Clojure.
-A class with no CRAP or mutation data is red.
+tools. The overlay joins a snapshot to the class whose `:ns` equals that
+namespace. Otherwise the class id owns that name (`bookwriter.model`
+owns `model`), a dotted child rolls up (`pdf` owns `pdf.Layout`), and
+the policy prefix belongs to the single undotted Rust class. `::` is
+read as `.`. A class with no CRAP or mutation data is red.
 
 ## IR
 
@@ -535,9 +538,11 @@ present, the overlay fills CC, coverage, CRAP, killed/survived/uncovered,
 and any functions found in the snapshots (including privates). Authored
 `:crap` / `:coverage` / `:ops` are the fallback when no snapshot exists.
 
-Overlay keys snapshots by class `:ns` (the real source namespace). The
-generator writes `:ns` from the scanned ns. Hand-written IR must set `:ns`
-the same way; there is no project-specific fallback.
+The overlay joins a snapshot to the class whose `:ns` equals that
+namespace. The generator writes `:ns` from the scanned ns. Hand-written
+IR must set `:ns` the same way. When no class has that `:ns`, the class
+id, a dotted child of that id, and the policy prefix on the single Rust
+crate root are the fallbacks.
 
 ```edn
 {:title "Lending library"

@@ -96,6 +96,79 @@
   (when-let [ns-name (:ns c)]
     (str ns-name)))
 
+(defn- normalize-ns
+  "Crapper separates Rust with `::` and every other language with `.`."
+  [s]
+  (when s
+    (str/replace (str s) #"::" ".")))
+
+(defn- prefix-name [prefix]
+  (cond
+    (nil? prefix) nil
+    (keyword? prefix) (name prefix)
+    :else (not-empty (str prefix))))
+
+(defn- sole-rust-root
+  "The one Rust crate class, when the tree has a single undotted Rust id."
+  [classes]
+  (let [roots (filterv (fn [c]
+                         (and (= :rust (:lang c))
+                              (not (:foreign c))
+                              (when-let [id (some-> (:id c) name)]
+                                (not (str/includes? id ".")))))
+                       classes)]
+    (when (= 1 (count roots))
+      (first roots))))
+
+(defn- claim-rank
+  "Sort key when `c` should display snapshot `snap`, or nil.
+  Exact `:ns` wins, then the class id (`bookwriter.model` owns `model`),
+  then a dotted child (`pdf` owns `pdf.Layout`). The policy prefix, which
+  is the Cargo package name, belongs to the Rust crate root."
+  [c prefix rust-root snap]
+  (let [ns-name (class-namespace c)
+        id-name (some-> (:id c) name)]
+    (cond
+      (= ns-name snap) [0 0]
+      (= id-name snap) [1 0]
+      (and id-name (str/starts-with? snap (str id-name ".")))
+      [2 (- (count id-name))]
+      (and rust-root (= c rust-root) prefix (= snap prefix)) [3 0]
+      :else nil)))
+
+(defn- snapshot-owner
+  "Project class that displays snapshot namespace `ns-name`."
+  [classes prefix ns-name]
+  (let [snap (normalize-ns ns-name)
+        prefix (prefix-name prefix)
+        rust-root (sole-rust-root classes)]
+    (->> classes
+         (remove :foreign)
+         (keep (fn [c]
+                 (when-let [rank (claim-rank c prefix rust-root snap)]
+                   [rank c])))
+         (sort-by first)
+         first
+         second)))
+
+(defn- owners-by-ns
+  "Class `:ns` to the snapshot namespaces that class displays."
+  [classes prefix snapshot-nss]
+  (reduce (fn [acc snap]
+            (if-let [c (snapshot-owner classes prefix snap)]
+              (let [k (class-namespace c)]
+                (if k
+                  (update acc k (fnil conj []) snap)
+                  acc))
+              acc))
+          {}
+          snapshot-nss))
+
+(defn- merge-mutate [snapshots]
+  (let [snaps (vec (keep identity snapshots))]
+    (when (seq snaps)
+      {:forms (vec (mapcat #(or (:forms %) []) snaps))})))
+
 (defn- pct->ratio [cov]
   (when (number? cov)
     (/ (double cov) 100.0)))
@@ -143,17 +216,20 @@
               (overlay-op base (get by-name nm) (get mut-fns nm))))
           names)))
 
-(defn overlay-class [c crap-by-ns mutate-by-ns]
-  (let [ns-name (class-namespace c)
-        crap-fns (or (get crap-by-ns ns-name) [])
-        mut-fns (mutate-by-fn (get mutate-by-ns ns-name))
-        scores (keep :crap crap-fns)
-        coverages (keep :coverage crap-fns)
-        ops (ops-for-class c crap-fns mut-fns)
-        killed (apply + 0 (keep :killed (vals mut-fns)))
-        survived (apply + 0 (keep :survived (vals mut-fns)))
-        uncovered (apply + 0 (keep :uncovered (vals mut-fns)))
-        sites (apply + 0 (map counted-sites (vals mut-fns)))]
+(defn overlay-class
+  ([c crap-by-ns mutate-by-ns]
+   (overlay-class c crap-by-ns mutate-by-ns nil))
+  ([c crap-by-ns mutate-by-ns owned]
+   (let [nss (if (nil? owned) [(class-namespace c)] owned)
+         crap-fns (vec (mapcat #(or (get crap-by-ns %) []) nss))
+         mut-fns (mutate-by-fn (merge-mutate (map #(get mutate-by-ns %) nss)))
+         scores (keep :crap crap-fns)
+         coverages (keep :coverage crap-fns)
+         ops (ops-for-class c crap-fns mut-fns)
+         killed (apply + 0 (keep :killed (vals mut-fns)))
+         survived (apply + 0 (keep :survived (vals mut-fns)))
+         uncovered (apply + 0 (keep :uncovered (vals mut-fns)))
+         sites (apply + 0 (map counted-sites (vals mut-fns)))]
     (cond-> c
       (seq scores) (assoc :crap (class-crap scores)
                           :cc (apply + (map :complexity crap-fns)))
@@ -161,30 +237,43 @@
                                          (/ (reduce + coverages) (count coverages))))
       (seq mut-fns) (assoc :killed killed :survived survived :uncovered uncovered
                            :sites sites)
-      (seq ops) (assoc :ops ops))))
+      (seq ops) (assoc :ops ops)))))
 
-(defn- paint-packages [packages metrics]
+(defn- snapshot-names [metrics]
+  (distinct (concat (keys (:crap metrics)) (keys (:mutate metrics)))))
+
+(defn- paint-class [c metrics owners]
+  (overlay-class c (:crap metrics) (:mutate metrics)
+                 (get owners (class-namespace c) [])))
+
+(defn- paint-packages [packages metrics owners]
   (mapv (fn [p]
           (update p :classes
                   (fn [cs]
-                    (mapv #(overlay-class % (:crap metrics) (:mutate metrics))
-                          cs))))
+                    (mapv #(paint-class % metrics owners) cs))))
         packages))
 
-(defn- paint-diagram [d metrics]
-  (ir/normalize (update d :packages paint-packages metrics)))
+(defn- paint-diagram [d metrics owners]
+  (ir/normalize (update d :packages #(paint-packages % metrics owners))))
+
+(defn- doc-classes [doc]
+  (cond
+    (:hierarchical doc) (:classes doc)
+    (:diagrams doc) (mapcat (fn [d] (mapcat :classes (:packages d))) (:diagrams doc))
+    :else (mapcat :classes (:packages doc))))
 
 (defn apply-metrics
   [doc metrics]
   (if (and (empty? (:crap metrics)) (empty? (:mutate metrics)))
     doc
-    (cond
-      (:hierarchical doc)
-      (update doc :classes
-              (fn [cs]
-                (mapv #(overlay-class % (:crap metrics) (:mutate metrics)) cs)))
-      (:diagrams doc)
-      (update doc :diagrams (fn [ds] (mapv #(paint-diagram % metrics) ds)))
-      (:packages doc)
-      (paint-diagram doc metrics)
-      :else doc)))
+    (let [owners (owners-by-ns (doc-classes doc)
+                               (:prefix doc)
+                               (snapshot-names metrics))]
+      (cond
+        (:hierarchical doc)
+        (update doc :classes #(mapv (fn [c] (paint-class c metrics owners)) %))
+        (:diagrams doc)
+        (update doc :diagrams #(mapv (fn [d] (paint-diagram d metrics owners)) %))
+        (:packages doc)
+        (paint-diagram doc metrics owners)
+        :else doc))))
