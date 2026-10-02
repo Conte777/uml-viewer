@@ -7,10 +7,11 @@ The diagram is already on screen.
 - Policy follows **namespace nesting**, not invented layers/components.
   Dots after the prefix are the tree. Do not add Domain/Engine-style
   packages. **Layer** and **component** mean the same thing.
-- TypeScript, Rust, and Python scanners sit beside `clojure-language`. This
+- TypeScript, Rust, Python, and Go scanners sit beside `clojure-language`. This
   policy stays `:lang :clojure`. Do not change Clojure scanning, source
   extraction, or the rule that missing CRAP and mutation are red.
-  CRAP and mutation for other languages are separate tools. The overlay
+  CRAP and mutation for other languages are separate tools; Go CRAP is
+  `uml-viewer.main.go-crap`. The overlay
   joins a snapshot by the class `:ns`, then by the class id. A class
   with no CRAP or mutation data is red. A non-Clojure project sets
   `:lang` or `:sources`.
