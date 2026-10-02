@@ -35,4 +35,6 @@
               [:main.ir-generator :typescript-language.graph-typescript] :association
               [:main.ir-generator :rust-language.graph-rust] :association
               [:main.ir-generator :python-language.graph-python] :association
-              [:main.ir-generator :go-language.graph-go] :association}}
+              [:main.ir-generator :go-language.graph-go] :association
+              [:main.go-crap :application.ir-generator] :association
+              [:main.go-crap :go-language.crap-go] :association}}

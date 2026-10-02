@@ -112,5 +112,6 @@
                                           'uml-viewer.python-language.source-python
                                           'uml-viewer.python-language.graph-python
                                           'uml-viewer.go-language.source-go
-                                          'uml-viewer.go-language.graph-go}
+                                          'uml-viewer.go-language.graph-go
+                                          'uml-viewer.go-language.crap-go}
                                         %)))))
