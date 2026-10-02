@@ -53,6 +53,109 @@
   (spit-file dir "tools/tool.go" "package tools\n\nimport \"example.com/shop/internal/model\"\n")
   dir)
 
+(defn- write-bank [dir]
+  (spit-file dir "go.mod" "module example.com/bank\n\ngo 1.21\n")
+  (spit-file dir "deps/deps.go"
+             (str "package deps\n\n"
+                  "import \"errors\"\n\n"
+                  "var ErrMissing = errors.New(\"missing\")\n\n"
+                  "type Domain string\n\n"
+                  "type ReleaseFn func() error\n\n"
+                  "type Reader interface {\n"
+                  "\tGet(id int) (string, error)\n"
+                  "\tList() []string\n"
+                  "}\n\n"
+                  "type Store interface {\n"
+                  "\tReader\n"
+                  "\tPut(id int, v string) error\n"
+                  "}\n\n"
+                  "type Clock interface {\n"
+                  "\tNow() int64\n"
+                  "}\n"))
+  (spit-file dir "model/model.go"
+             (str "package model\n\n"
+                  "type Base struct{ ID int }\n\n"
+                  "type User[T any] struct {\n"
+                  "\tBase\n"
+                  "\tData T\n"
+                  "}\n\n"
+                  "func (u *User[T]) Name() string { return \"}\" }\n\n"
+                  "func NewUser() {}\n\n"
+                  "func lower() {}\n"))
+  (spit-file dir "store/postgres/repo.go"
+             (str "package postgres\n\n"
+                  "import (\n"
+                  "\td \"example.com/bank/deps\"\n"
+                  "\t\"example.com/bank/model\"\n"
+                  ")\n\n"
+                  "type (\n"
+                  "\tRepo struct {\n"
+                  "\t\t*model.Base\n"
+                  "\t\tdb string `json:\"db}\"`\n"
+                  "\t}\n"
+                  "\tcache map[string]struct{}\n"
+                  ")\n\n"
+                  "func New() *Repo { return &Repo{} }\n\n"
+                  "func (r *Repo) Get(id int) (string, error) { return \"\", nil }\n"
+                  "func (r *Repo) List() []string { return nil }\n"
+                  "func (r Repo) Put(id int, v string) error { return nil }\n"
+                  "func helper() {}\n\n"
+                  "var _ d.Clock = nil\n"))
+  (spit-file dir "memory/mem.go"
+             (str "package memory\n\n"
+                  "type Mem struct{}\n\n"
+                  "func (m *Mem) Now() int64 { return 0 }\n"
+                  "func (m *Mem) Get(id int) (string, error) { return \"\", nil }\n"
+                  "func (m *Mem) List() []string { return nil }\n"))
+  (spit-file dir "clock/clock.go"
+             (str "package clock\n\n"
+                  "type Sys struct{}\n\n"
+                  "func (Sys) Now() int64 { return 0 }\n"))
+  (spit-file dir "audit/audit.go"
+             (str "package audit\n\n"
+                  "import \"example.com/bank/deps\"\n\n"
+                  "type Log interface {\n"
+                  "\tdeps.Reader\n"
+                  "\tAppend(s string)\n"
+                  "}\n"))
+  (spit-file dir "journal/journal.go"
+             (str "package journal\n\n"
+                  "type J struct{}\n\n"
+                  "func (j *J) Append(s string) {}\n"
+                  "func (j *J) Get(id int) (string, error) { return \"\", nil }\n"
+                  "func (j *J) List() []string { return nil }\n"))
+  dir)
+
+(describe "go types"
+  (it "links implementations, embedding, ops, and interface packages"
+    (let [g (graph/scan (graph/lookup :go) (write-bank (temp-root)) {:prefix "bank"})
+          by-id (into {} (map (juxt :id identity) (:classes g)))
+          typed (set (keep (fn [{:keys [from to kind]}]
+                             (when (not= :dependency kind) [from to kind]))
+                           (:edges g)))]
+      (should= #{[:store.postgres :deps :implements]
+                 [:store.postgres :model :inheritance]
+                 [:memory :deps :implements]
+                 [:journal :deps :implements]
+                 [:journal :audit :implements]
+                 [:audit :deps :inheritance]}
+               typed)
+      (should= :interface (:stereotype (by-id :deps)))
+      (should= :interface (:stereotype (by-id :audit)))
+      (should-be-nil (:stereotype (by-id :model)))
+      (should-be-nil (:stereotype (by-id :store.postgres)))
+      (should= [{:name "Repo" :text "Repo"}
+                {:name "cache" :text "cache" :private true}
+                {:name "New" :text "New"}
+                {:name "Repo.Get" :text "Repo.Get" :private true}
+                {:name "Repo.List" :text "Repo.List" :private true}
+                {:name "Repo.Put" :text "Repo.Put" :private true}
+                {:name "helper" :text "helper" :private true}]
+               (:ops (by-id :store.postgres)))
+      (should= ["Base" "User" "User.Name" "NewUser" "lower"]
+               (map :name (:ops (by-id :model))))
+      (should= ["Domain" "ReleaseFn" "Reader" "Store" "Clock"] (map :name (:ops (by-id :deps)))))))
+
 (describe "go graph"
   (it "makes one class per package with import edges and foreign packages"
     (let [dir (write-shop (temp-root))

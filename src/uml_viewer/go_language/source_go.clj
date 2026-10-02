@@ -13,12 +13,26 @@
       [(format "(?m)^func\\s+%s\\b" (Pattern/quote owner))
        (format "(?m)^type\\s+%s\\b" (Pattern/quote owner))])))
 
+(defn- grouped-type-start
+  "Start of `\\tName` directly inside a `type ( ... )` group, or nil."
+  [source member-name]
+  (when-not (str/includes? (str member-name) ".")
+    (let [groups (re-matcher #"(?ms)^type\s*\((.*?)^\)" source)
+          entry (Pattern/compile (format "(?m)^\\t%s\\b" (Pattern/quote member-name)))]
+      (loop []
+        (when (.find groups)
+          (let [m (.matcher entry (.group groups 1))]
+            (if (.find m)
+              (+ (.start groups 1) (.start m) 1)
+              (recur))))))))
+
 (defn- member-start [source member-name]
   (when (and source (seq (str member-name)))
-    (some (fn [pattern]
-            (let [m (.matcher (Pattern/compile pattern) source)]
-              (when (.find m) (.start m))))
-          (member-patterns member-name))))
+    (or (some (fn [pattern]
+                (let [m (.matcher (Pattern/compile pattern) source)]
+                  (when (.find m) (.start m))))
+              (member-patterns member-name))
+        (grouped-type-start source member-name))))
 
 (defn member-line
   "1-based line of `member-name` in `source`, or nil."

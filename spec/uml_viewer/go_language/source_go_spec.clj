@@ -14,7 +14,13 @@
                          "orders.go" (str "package store\n\n"
                                           "func (s *Store) Orders() []int {\n"
                                           "\treturn nil\n}\n\n"
-                                          "func (s Store) Close() {}\n")
+                                          "func (s Store) Close() {}\n\n"
+                                          "type (\n"
+                                          "\tCursor struct {\n"
+                                          "\t\tPage int\n"
+                                          "\t}\n"
+                                          "\tPage int\n"
+                                          ")\n")
                          "store_test.go" "package store\n\nfunc Helper() {}\n"}]
       (let [f (io/file dir name)]
         (io/make-parents f)
@@ -47,6 +53,12 @@
       (should= (.getPath (io/file dir "orders.go")) (:file orders))
       (should= 3 (:line orders))
       (should= 7 (:line close))))
+
+  (it "finds a type declared in a type group"
+    (let [dir (package-dir)
+          ident {:lang :go :ns "shop.store" :file (.getPath (io/file dir "doc.go"))}]
+      (should= 10 (:line (source/member-source (assoc ident :name "Cursor"))))
+      (should= 13 (:line (source/member-source (assoc ident :name "Page"))))))
 
   (it "ignores test files and missing members"
     (let [dir (package-dir)
