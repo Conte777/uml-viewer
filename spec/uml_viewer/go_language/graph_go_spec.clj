@@ -95,6 +95,35 @@
       (should-not (contains? ids :fmt))
       (should (contains? doc-edges [:internal.store :github.com :dependency]))))
 
+  (it "reads the sources itself when go list fails, with the same graph"
+    (let [listed (write-shop (temp-root))
+          parsed (write-shop (temp-root))
+          _ (spit (io/file parsed "go.mod")
+                  "module example.com/shop\n\ngo 1.99\n\nrequire github.com/lib/pq v1.10.9\n")
+          _ (spit-file parsed "vendor/github.com/lib/pq/conn.go"
+                       "package pq\n\nimport \"example.com/shop/internal/model\"\n")
+          _ (spit-file parsed "internal/model/strings.go"
+                       (str "/* import \"os\" */\n"
+                            "// import \"os\"\n"
+                            "package model\n\n"
+                            "const site = \"http://example.com\" // import \"os\"\n"
+                            "const raw = `\nimport \"os\"\n`\n"))
+          _ (spit-file listed "internal/model/strings.go"
+                       (str "package model\n\n"
+                            "const site = \"http://example.com\"\n"))
+          scan #(graph/scan (graph/lookup :go) % {:prefix "shop"})
+          from-list (scan listed)
+          err (java.io.StringWriter.)
+          from-source (binding [*err* err] (scan parsed))]
+      (should (str/includes? (str err) "go list"))
+      (should= (set (:edges from-list)) (set (:edges from-source)))
+      (should= (set (map #(dissoc % :file) (:classes from-list)))
+               (set (map #(dissoc % :file) (:classes from-source))))
+      (should= (set (map #(some-> (:file %) (str/replace (str (.getCanonicalPath listed)) ""))
+                         (:classes from-list)))
+               (set (map #(some-> (:file %) (str/replace (str (.getCanonicalPath parsed)) ""))
+                         (:classes from-source))))))
+
   (it "names a source tree under its own namespace root"
     (let [dir (write-shop (temp-root))
           g (graph/scan (graph/lookup :go) (io/file dir "internal")
