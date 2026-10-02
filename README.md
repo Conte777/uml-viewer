@@ -191,9 +191,9 @@ namespace is a `:dependency`. `requiring-resolve` of a quoted var is a
 `:stereotype :interface`. `defrecord` or `deftype` of a protocol is
 `:implements`. External `:require`s and `:import`s become **foreign**
 classes. The overlay fills Clojure members from `.metrics/`. TypeScript,
-Rust, and Python are separate scanners (see
-[Language graphs](#language-graphs)): one class per module, with exported
-members as `:ops`. The overlay joins each snapshot by `:ns`, then by
+Rust, Python, and Go are separate scanners (see
+[Language graphs](#language-graphs)): one class per module (a Go
+package), with exported members as `:ops`. The overlay joins each snapshot by `:ns`, then by
 the class id.
 
 ### Do not invent layers (components)
@@ -252,9 +252,9 @@ Right (the ns tree):
  :foreign [quil]
  :order [main adapters application engine source graph
          clojure-language typescript-language rust-language python-language
-         domain]
+         go-language domain]
  :levels [[domain source graph clojure-language typescript-language
-           rust-language python-language]
+           rust-language python-language go-language]
           [engine]
           [application]
           [adapters]
@@ -514,13 +514,44 @@ project name. `list[Animal]` is not. Public module-level functions and
 classes are `:ops`. A module whose public classes are only `Protocol` or
 `ABC` bases, with no public functions, is `:stereotype :interface`.
 
+**Go** (`uml-viewer.go-language.graph-go`) emits one class per package
+(directory). It asks `go list -e ./...` with `GOPROXY=off`, so it never
+downloads a module; a missing module still leaves the package's imports.
+When `go` is not on the path or `go list` fails, it reads the sources
+itself and prints one line to stderr; it does not follow directory
+symlinks. That reader does not apply build
+constraints (`//go:build`, `_linux.go`). Both skip `_test.go`, `vendor`,
+`testdata`, directories starting with `_` or `.`, and nested modules;
+`go.work` is not read, so list each module under `:sources`. A package's
+`:ns` is the source prefix plus its directory, dotted:
+`internal/store` under prefix `shop` is `shop.internal.store`
+(`:internal.store`). `:file` is `doc.go`, else `<package>.go`, else the
+first file. An import of a project package is a dependency; any other
+import is foreign with its slashes as dots (`net/http` becomes
+`:net.http`, `github.com/lib/pq` becomes `:github.com.lib.pq`). A type
+with every method, by name, of a project interface of two or more
+methods in another package is `:implements` that package, without an
+import. Embedded interfaces count their methods. Embedding a type of
+another project package is `:inheritance`. Exported functions and
+types are `:ops`; methods (`Type.Method`) and unexported names are
+private ops. A package with exported interfaces and no exported functions
+or structs, other than error types (a struct with an `Error` method), is
+`:stereotype :interface`.
+
 `merge-scans` links a TypeScript `invoke("read_text")` to the Rust class
 that owns `#[tauri::command] fn read_text`, as a `:dependency`. Two
 project classes with the same id are an error. When a dependency and an
 `:implements` edge join the same pair, the IR keeps `:implements`.
 
 CRAP and mutation for TypeScript, Rust, and Python come from separate
-tools. The overlay joins a snapshot to the class whose `:ns` equals that
+tools. Go CRAP comes from `uml-viewer.main.go-crap [policy] [out]`, run
+from the project directory like the IR generator. It runs
+`go test -coverprofile ./...` and `go tool cover -func`, counts
+complexity as 1 plus each `if`, `for`, `case`, `&&`, and `||`, and
+writes `.metrics/crap.edn` keyed by each package's `:ns`, with methods
+as `Type.Method`. Entries of other namespaces in that file are kept. A
+failing `go test` is printed to stderr and its coverage is still used. Go
+has no mutation tool here. The overlay joins a snapshot to the class whose `:ns` equals that
 namespace. Otherwise the class id owns that name (`bookwriter.model`
 owns `model`), a dotted child rolls up (`pdf` owns `pdf.Layout`), and
 the policy prefix belongs to the single undotted Rust class. `::` is
@@ -646,7 +677,10 @@ extractor must satisfy `LanguageSource`:
 **TypeScript** (`uml-viewer.typescript-language.source-typescript`),
 **Rust** (`uml-viewer.rust-language.source-rust`), and **Python**
 (`uml-viewer.python-language.source-python`) open `:file` and find the
-exported declaration, the `fn`, or the `def`. The class card passes
+exported declaration, the `fn`, or the `def`. **Go**
+(`uml-viewer.go-language.source-go`) searches the non-test files in the
+directory of `:file` for `func Name`, `type Name` (also inside a
+`type ( … )` group), or the method `Type.Method`. The class card passes
 `:lang` and `:file` from the class. A class with no `:lang` still uses
 the Clojure extractor that Main passes in. The protocol is the seam; do
 not special-case languages in the class card.

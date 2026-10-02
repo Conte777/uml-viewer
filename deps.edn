@@ -4,6 +4,7 @@
  {:spec {:extra-paths ["spec"]
          :extra-deps {speclj/speclj {:mvn/version "3.12.2"}
                       quil/quil {:mvn/version "4.3.1563"}}
+         :jvm-opts ["-Dapple.awt.UIElement=true"]
          :main-opts ["-m" "speclj.main" "-c"]}
   :cov {:extra-paths ["spec"]
         :extra-deps {cloverage/cloverage {:mvn/version "1.2.4"}
@@ -22,7 +23,7 @@
                         org.clojure/tools.reader {:mvn/version "1.4.2"}
                         speclj/speclj {:mvn/version "3.12.2"}
                         quil/quil {:mvn/version "4.3.1563"}}
-           :main-opts ["-m" "clj-mutate.core"]}
+           :main-opts ["-m" "clj-mutate.core" "--max-workers" "4"]}
   :ir {:main-opts ["-m" "uml-viewer.main.ir-generator"]}
   :run {:extra-deps {quil/quil {:mvn/version "4.3.1563"}}
         :main-opts ["-m" "uml-viewer.main.uml-viewer"]}

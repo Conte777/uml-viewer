@@ -16,25 +16,32 @@
                  pprint/*print-right-margin* 90]
          (with-out-str (pprint/pprint doc)))))
 
-(defn- scan-source
-  "One `:sources` entry. `:prefix` on the entry is that tree's namespace
-  root; the policy `:prefix` is what `id-of` strips."
-  [policy source]
-  (let [lang (keyword (or (:lang source) (:lang policy) :clojure))
-        impl (or (graph/lookup lang)
+(defn source-trees
+  "Each source tree of `policy` as `{:lang :root :prefix :ns-prefix}`.
+  `:prefix` is the policy prefix that `id-of` strips. A `:sources` entry's
+  `:prefix` is that tree's namespace root."
+  [policy]
+  (let [prefix (or (:prefix policy) "uml-viewer")
+        tree (fn [source]
+               {:lang (keyword (or (:lang source) (:lang policy) :clojure))
+                :root (or (:root source) (:src source) (:src policy) "src")
+                :prefix prefix
+                :ns-prefix (or (:prefix source) prefix)})]
+    (if (seq (:sources policy))
+      (mapv tree (:sources policy))
+      [(tree {})])))
+
+(defn- scan-tree [{:keys [lang root prefix ns-prefix]}]
+  (let [impl (or (graph/lookup lang)
                  (throw (ex-info (str "no LanguageGraph for " lang) {:lang lang})))]
-    (graph/scan impl
-                (or (:root source) (:src source) (:src policy) "src")
-                {:prefix (or (:prefix policy) "uml-viewer")
-                 :ns-prefix (or (:prefix source) (:prefix policy) "uml-viewer")
-                 :lang lang})))
+    (graph/scan impl root {:prefix prefix :ns-prefix ns-prefix :lang lang})))
 
 (defn scan-policy
   "Scan `policy`. `:sources` merges one scanner per entry.
   Otherwise `graph-impl` scans `:src` with the policy prefix."
   [graph-impl policy]
   (if (seq (:sources policy))
-    (graph/merge-scans (mapv #(scan-source policy %) (:sources policy)))
+    (graph/merge-scans (mapv scan-tree (source-trees policy)))
     (graph/scan graph-impl
                 (or (:src policy) "src")
                 {:prefix (or (:prefix policy) "uml-viewer")})))

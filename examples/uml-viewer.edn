@@ -4,20 +4,25 @@
  :prefix "uml-viewer",
  :edge-kinds
  {[:main.uml-viewer :adapters.core] :association,
+  [:main.go-crap :application.ir-generator] :association,
   [:main.ir-generator :typescript-language.graph-typescript] :association,
   [:application.document :domain.hierarchy] :association,
   [:main.ir-generator :clojure-language.graph-clojure] :association,
   [:main.uml-viewer :rust-language.source-rust] :association,
   [:application.document :engine.compose] :association,
   [:main.uml-viewer :typescript-language.source-typescript] :association,
+  [:main.ir-generator :go-language.graph-go] :association,
   [:main :python-language] :association,
   [:engine.compose :engine.layout] :association,
   [:engine.compose :engine.route] :association,
   [:main.ir-generator :rust-language.graph-rust] :association,
   [:adapters.core :adapters.sketch] :association,
+  [:main.uml-viewer :go-language.source-go] :association,
   [:main :application] :association,
+  [:main :go-language] :association,
   [:main.uml-viewer :clojure-language.source-clojure] :association,
   [:main :clojure-language] :association,
+  [:main.go-crap :go-language.crap-go] :association,
   [:main.ir-generator :application.ir-generator] :association,
   [:main.uml-viewer :python-language.source-python] :association,
   [:main :adapters] :association,
@@ -32,7 +37,8 @@
    :clojure-language
    :typescript-language
    :rust-language
-   :python-language]
+   :python-language
+   :go-language]
   [:engine]
   [:application]
   [:adapters]
@@ -49,14 +55,18 @@
   :typescript-language
   :rust-language
   :python-language
+  :go-language
   :domain],
  :omit [],
  :edges
  [{:from :main.uml-viewer, :to :adapters.core, :kind :dependency}
   {:from :typescript-language.source-typescript, :to :source, :kind :implements}
+  {:from :main.go-crap, :to :application.ir-generator, :kind :dependency}
   {:from :main.ir-generator,
    :to :typescript-language.graph-typescript,
    :kind :dependency}
+  {:from :go-language.graph-go, :to :go-language.reader, :kind :dependency}
+  {:from :go-language.source-go, :to :go-language.reader, :kind :dependency}
   {:from :clojure-language.source-clojure, :to :source, :kind :implements}
   {:from :adapters.draw, :to :application.document, :kind :dependency}
   {:from :rust-language.source-rust, :to :source, :kind :implements}
@@ -79,6 +89,8 @@
   {:from :adapters.draw, :to :application.detail, :kind :dependency}
   {:from :adapters.draw, :to :quil, :kind :dependency}
   {:from :main.uml-viewer, :to :domain.log, :kind :dependency}
+  {:from :main.ir-generator, :to :go-language.graph-go, :kind :dependency}
+  {:from :go-language.source-go, :to :source, :kind :implements}
   {:from :adapters.draw, :to :engine.curve, :kind :dependency}
   {:from :application.events, :to :application.detail, :kind :dependency}
   {:from :adapters.source-window, :to :source, :kind :dependency}
@@ -106,11 +118,13 @@
   {:from :adapters.sketch, :to :adapters.source-window, :kind :dependency}
   {:from :adapters.sketch, :to :domain.mailbox, :kind :dependency}
   {:from :adapters.core, :to :adapters.sketch, :kind :dependency}
+  {:from :main.uml-viewer, :to :go-language.source-go, :kind :dependency}
   {:from :engine.hit, :to :engine.layout, :kind :dependency}
   {:from :application.document, :to :domain.policy, :kind :dependency}
   {:from :typescript-language.graph-typescript, :to :graph, :kind :implements}
   {:from :engine.hit, :to :domain.geom, :kind :dependency}
   {:from :adapters.draw, :to :domain.config, :kind :dependency}
+  {:from :go-language.reader, :to :graph, :kind :dependency}
   {:from :main.uml-viewer, :to :clojure-language.source-clojure, :kind :dependency}
   {:from :engine.curve, :to :domain.geom, :kind :dependency}
   {:from :python-language.source-python, :to :source, :kind :implements}
@@ -119,6 +133,7 @@
   {:from :adapters.draw, :to :engine.layout, :kind :dependency}
   {:from :adapters.sketch, :to :engine.hit, :kind :dependency}
   {:from :application.overlay, :to :domain.ir, :kind :dependency}
+  {:from :main.go-crap, :to :go-language.crap-go, :kind :dependency}
   {:from :main.ir-generator, :to :application.ir-generator, :kind :dependency}
   {:from :adapters.sketch, :to :domain.policy, :kind :dependency}
   {:from :main.uml-viewer, :to :python-language.source-python, :kind :dependency}
@@ -129,9 +144,11 @@
   {:from :application.events, :to :engine.hit, :kind :dependency}
   {:from :adapters.sketch, :to :application.overlay, :kind :dependency}
   {:from :application.document, :to :application.overlay, :kind :dependency}
+  {:from :go-language.graph-go, :to :graph, :kind :implements}
   {:from :application.document, :to :domain.mailbox, :kind :dependency}
   {:from :engine.route, :to :domain.geom, :kind :dependency}
   {:from :adapters.source-window, :to :javax.swing, :kind :dependency}
+  {:from :go-language.crap-go, :to :go-language.reader, :kind :dependency}
   {:from :adapters.sketch, :to :javax.swing, :kind :dependency}],
  :classes
  [{:stereotype nil,
@@ -295,6 +312,34 @@
    :level 1,
    :lang :clojure,
    :id :engine.route}
+  {:stereotype nil,
+   :ns "uml-viewer.go-language.crap-go",
+   :name "CrapGo",
+   :file "src/uml_viewer/go_language/crap_go.clj",
+   :level 0,
+   :lang :clojure,
+   :id :go-language.crap-go}
+  {:stereotype nil,
+   :ns "uml-viewer.go-language.graph-go",
+   :name "GraphGo",
+   :file "src/uml_viewer/go_language/graph_go.clj",
+   :level 0,
+   :lang :clojure,
+   :id :go-language.graph-go}
+  {:stereotype nil,
+   :ns "uml-viewer.go-language.reader",
+   :name "Reader",
+   :file "src/uml_viewer/go_language/reader.clj",
+   :level 0,
+   :lang :clojure,
+   :id :go-language.reader}
+  {:stereotype nil,
+   :ns "uml-viewer.go-language.source-go",
+   :name "SourceGo",
+   :file "src/uml_viewer/go_language/source_go.clj",
+   :level 0,
+   :lang :clojure,
+   :id :go-language.source-go}
   {:stereotype :interface,
    :ns "uml-viewer.graph",
    :name "Graph",
@@ -302,6 +347,13 @@
    :level 0,
    :lang :clojure,
    :id :graph}
+  {:stereotype nil,
+   :ns "uml-viewer.main.go-crap",
+   :name "GoCrap",
+   :file "src/uml_viewer/main/go_crap.clj",
+   :level 4,
+   :lang :clojure,
+   :id :main.go-crap}
   {:stereotype nil,
    :ns "uml-viewer.main.ir-generator",
    :name "IrGenerator",
