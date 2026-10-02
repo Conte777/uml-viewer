@@ -518,7 +518,8 @@ classes are `:ops`. A module whose public classes are only `Protocol` or
 (directory). It asks `go list -e ./...` with `GOPROXY=off`, so it never
 downloads a module; a missing module still leaves the package's imports.
 When `go` is not on the path or `go list` fails, it reads the sources
-itself and prints one line to stderr. That reader does not apply build
+itself and prints one line to stderr; it does not follow directory
+symlinks. That reader does not apply build
 constraints (`//go:build`, `_linux.go`). Both skip `_test.go`, `vendor`,
 `testdata`, directories starting with `_` or `.`, and nested modules;
 `go.work` is not read, so list each module under `:sources`. A package's
@@ -533,8 +534,9 @@ methods in another package is `:implements` that package, without an
 import. Embedded interfaces count their methods. Embedding a type of
 another project package is `:inheritance`. Exported functions and
 types are `:ops`; methods (`Type.Method`) and unexported names are
-private ops. A package with exported interfaces and no exported structs
-or functions is `:stereotype :interface`.
+private ops. A package with exported interfaces and no exported functions
+or structs, other than error types (a struct with an `Error` method), is
+`:stereotype :interface`.
 
 `merge-scans` links a TypeScript `invoke("read_text")` to the Rust class
 that owns `#[tauri::command] fn read_text`, as a `:dependency`. Two

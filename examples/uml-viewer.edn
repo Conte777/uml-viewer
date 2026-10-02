@@ -66,6 +66,7 @@
    :to :typescript-language.graph-typescript,
    :kind :dependency}
   {:from :go-language.graph-go, :to :go-language.reader, :kind :dependency}
+  {:from :go-language.source-go, :to :go-language.reader, :kind :dependency}
   {:from :clojure-language.source-clojure, :to :source, :kind :implements}
   {:from :adapters.draw, :to :application.document, :kind :dependency}
   {:from :rust-language.source-rust, :to :source, :kind :implements}

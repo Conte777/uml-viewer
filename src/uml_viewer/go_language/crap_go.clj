@@ -46,7 +46,11 @@
              (.directory (io/file root))
              (.redirectErrorStream true))
         _ (.put (.environment pb) "GOPROXY" "off")
-        proc (.start pb)
+        proc (try
+               (.start pb)
+               (catch java.io.IOException e
+                 (throw (ex-info (str "go-crap needs go on the path: " (ex-message e))
+                                 {:root (str root)}))))
         out (slurp (.getInputStream proc))]
     {:exit (.waitFor proc) :out out}))
 
@@ -73,43 +77,33 @@
 (defn crap [cc cov]
   (+ (* cc cc (Math/pow (- 1.0 (/ cov 100.0)) 3)) cc))
 
-(defn entries
-  "CRAP entries of the Go packages under `root`, keyed by each package's namespace."
-  [root prefix ns-prefix]
+(defn- tree-report
+  "Namespaces of the Go packages under `root`, and their CRAP entries."
+  [{:keys [root prefix ns-prefix]}]
   (let [rootf (.getCanonicalFile (io/file root))
-        covered (coverage rootf)]
-    (vec
-      (for [pkg (reader/package-index rootf prefix ns-prefix)
-            file (:files pkg)
-            f (functions (slurp (io/file (:dir pkg) file)))
-            :let [cov (get covered [(str (:import-path pkg) "/" file) (:line f)] 0.0)]]
-        {:name (:name f)
-         :namespace (:ns pkg)
-         :complexity (:complexity f)
-         :coverage cov
-         :crap (crap (:complexity f) cov)}))))
-
-(defn- go-sources
-  "Go source trees of `policy`, with the same defaults as the IR generator."
-  [policy]
-  (let [prefix (or (:prefix policy) "uml-viewer")
-        lang-of #(keyword (or (:lang %) (:lang policy) :clojure))]
-    (if (seq (:sources policy))
-      (for [s (:sources policy) :when (= :go (lang-of s))]
-        {:root (or (:root s) (:src s) (:src policy) "src")
-         :prefix prefix
-         :ns-prefix (or (:prefix s) prefix)})
-      (when (= :go (lang-of {}))
-        [{:root (or (:src policy) "src") :prefix prefix :ns-prefix prefix}]))))
+        covered (coverage rootf)
+        pkgs (reader/package-index rootf prefix ns-prefix)]
+    {:namespaces (set (map :ns pkgs))
+     :entries (vec
+                (for [pkg pkgs
+                      file (:files pkg)
+                      f (functions (slurp (io/file (:dir pkg) file)))
+                      :let [cov (get covered [(str (:import-path pkg) "/" file) (:line f)] 0.0)]]
+                  {:name (:name f)
+                   :namespace (:ns pkg)
+                   :complexity (:complexity f)
+                   :coverage cov
+                   :crap (crap (:complexity f) cov)}))}))
 
 (defn write!
-  "Write CRAP for the Go sources of `policy` into `out`. Entries of other
-  namespaces already in `out` are kept."
-  [policy out]
-  (let [fresh (vec (mapcat #(entries (:root %) (:prefix %) (:ns-prefix %)) (go-sources policy)))
-        owned (set (map :namespace fresh))
+  "Write CRAP for the Go source `trees` into `out`. Entries already in `out`
+  for other namespaces are kept; those of the scanned packages are replaced."
+  [trees out]
+  (let [reports (mapv tree-report trees)
+        owned (into #{} (mapcat :namespaces) reports)
+        fresh (vec (mapcat :entries reports))
         old (when (.isFile (io/file out)) (:entries (edn/read-string (slurp out))))
         kept (remove #(owned (:namespace %)) old)]
     (io/make-parents (io/file out))
-    (spit out (pr-str {:entries (vec (sort-by (comp - :crap) (concat kept fresh)))}))
+    (spit out (pr-str {:entries (vec (sort-by #(- (or (:crap %) 0)) (concat kept fresh)))}))
     (count fresh)))

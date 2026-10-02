@@ -36,6 +36,7 @@
                (str "package calc\n\nimport \"testing\"\n\n"
                     "func TestSign(t *testing.T) { Sign(1); Sign(-1); Sign(0) }\n"))
     (spit-file dir "sub/sub.go" "package sub\n\nfunc F() {}\n")
+    (spit-file dir "shapes/shapes.go" "package shapes\n\ntype Shape interface{ Area() int }\n")
     (spit-file dir "flaky/flaky.go" "package flaky\n\nfunc G() int { return 1 }\n")
     (spit-file dir "flaky/flaky_test.go"
                (str "package flaky\n\nimport \"testing\"\n\n"
@@ -43,7 +44,8 @@
     (spit-file dir "calc.policy.edn" (pr-str {:prefix "calc" :lang :go :src (str dir)}))
     (spit-file dir ".metrics/crap.edn"
                (pr-str {:entries [{:name "keep" :namespace "other" :complexity 1 :coverage 100.0 :crap 1.0}
-                                  {:name "Gone" :namespace "calc" :complexity 1 :coverage 0.0 :crap 2.0}]}))
+                                  {:name "Gone" :namespace "calc" :complexity 1 :coverage 0.0 :crap 2.0}
+                                  {:name "Area" :namespace "calc.shapes" :complexity 1 :coverage 0.0 :crap 2.0}]}))
     dir))
 
 (describe "go crap"

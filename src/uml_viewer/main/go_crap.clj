@@ -5,5 +5,7 @@
 
 (defn -main [& args]
   (let [policy-path (or (first args) "examples/uml-viewer.policy.edn")
-        out (or (second args) ".metrics/crap.edn")]
-    (println "Wrote" (crap-go/write! (ir-generator/read-policy policy-path) out) "Go entries to" out)))
+        out (or (second args) ".metrics/crap.edn")
+        trees (filter #(= :go (:lang %))
+                      (ir-generator/source-trees (ir-generator/read-policy policy-path)))]
+    (println "Wrote" (crap-go/write! trees out) "Go entries to" out)))

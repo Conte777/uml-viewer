@@ -5,7 +5,7 @@
             [uml-viewer.graph :as graph]))
 
 (def ^:private list-template
-  "{{.Dir}}\t{{.ImportPath}}\t{{.Name}}\t{{join .GoFiles \",\"}}\t{{join .Imports \",\"}}")
+  "{{.Dir}}\t{{.ImportPath}}\t{{.Name}}\t{{join .GoFiles \",\"}},{{join .CgoFiles \",\"}}\t{{join .Imports \",\"}}")
 
 (defn- split-list [s]
   (vec (remove str/blank? (str/split (str s) #","))))
@@ -19,7 +19,7 @@
      :imports (split-list imports)}))
 
 (defn- run-go-list [root]
-  (let [pb (doto (ProcessBuilder. ["go" "list" "-e" "-f" list-template "./..."])
+  (let [pb (doto (ProcessBuilder. ^java.util.List ["go" "list" "-e" "-f" list-template "./..."])
              (.directory root))
         _ (.put (.environment pb) "GOPROXY" "off")
         proc (.start pb)
@@ -124,7 +124,9 @@
              (#{"vendor" "testdata"} name)
              (.isFile (io/file dir "go.mod"))))))
 
-(defn- go-source? [^java.io.File f]
+(defn go-source?
+  "A file go build reads: `.go`, not a test, not hidden by `_` or `.`."
+  [^java.io.File f]
   (let [name (.getName f)]
     (and (.isFile f)
          (str/ends-with? name ".go")
@@ -144,7 +146,9 @@
         mod-dir (if mod-file (.getParentFile mod-file) root)
         mod-path (module-path mod-file)
         dirs (tree-seq (fn [d] (and (.isDirectory d) (not (skip-dir? d root))))
-                       (fn [d] (filter #(.isDirectory %) (.listFiles d)))
+                       (fn [d] (filter #(and (.isDirectory %)
+                                             (not (java.nio.file.Files/isSymbolicLink (.toPath %))))
+                                       (.listFiles d)))
                        root)]
     (->> dirs
          (remove #(skip-dir? % root))
@@ -220,20 +224,25 @@
         (recur (inc j))
         j))))
 
+(defn- ahead
+  "Up to 256 characters of `text` from `i`, enough for a name or a keyword."
+  [^String text i]
+  (subs text i (min (count text) (+ i 256))))
+
 (defn- body-type
   "`[:struct body end]`, `[:interface body end]`, or `[:other nil end]` for the type at `i`."
   [^String text i]
-  (if-let [[head kind] (re-find #"^(struct|interface)\s*\{" (subs text i))]
+  (if-let [[head kind] (re-find #"^(struct|interface)\s*\{" (ahead text i))]
     (let [brace (+ i (dec (count head)))
           end (close-of text brace)]
       [(keyword kind) (subs text (inc brace) (max (inc brace) (dec end))) end])
     [:other nil (line-end text i)]))
 
 (defn- type-entry [^String text i]
-  (when-let [type-name (re-find #"^[A-Za-z_][A-Za-z0-9_]*" (subs text i))]
+  (when-let [type-name (re-find #"^[A-Za-z_][A-Za-z0-9_]*" (ahead text i))]
     (let [j (+ i (count type-name))
           j (if (and (< j (count text)) (= \[ (.charAt text j))) (close-of text j) j)
-          j (+ j (count (re-find #"^[ \t]*=?[ \t]*" (subs text j))))
+          j (+ j (count (re-find #"^[ \t]*=?[ \t]*" (ahead text j))))
           [kind body end] (body-type text j)]
       {:name type-name :pos i :kind kind :body body :end end})))
 

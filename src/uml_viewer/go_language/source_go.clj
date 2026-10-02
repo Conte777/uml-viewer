@@ -2,6 +2,7 @@
   "Go LanguageSource: a class is a package directory; find a func, method, or type in it."
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
+            [uml-viewer.go-language.reader :as reader]
             [uml-viewer.source :as source])
   (:import [java.util.regex Pattern]))
 
@@ -52,12 +53,9 @@
 
 (defn- package-files [file]
   (->> (.listFiles (.getParentFile (io/file file)))
-       (filter #(.isFile %))
-       (map #(.getName %))
-       (filter #(str/ends-with? % ".go"))
-       (remove #(str/ends-with? % "_test.go"))
-       sort
-       (map #(slashes (.getPath (io/file (.getParentFile (io/file file)) %))))))
+       (filter reader/go-source?)
+       (sort-by #(.getName %))
+       (map #(slashes (.getPath %)))))
 
 (defn- existing-file [ident]
   (let [f (:file ident)]

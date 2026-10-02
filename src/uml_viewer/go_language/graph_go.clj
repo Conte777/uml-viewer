@@ -16,8 +16,20 @@
 (defn- foreign-id [import-path]
   (keyword (str/replace import-path "/" ".")))
 
+(defn- top-level
+  "`body` with everything inside nested braces blanked, newlines included."
+  [body]
+  (let [sb (StringBuilder.)]
+    (reduce (fn [depth c]
+              (let [inner (if (= c \}) (dec depth) depth)]
+                (.append sb (if (pos? inner) \space c))
+                (if (= c \{) (inc depth) inner)))
+            0
+            (str body))
+    (str sb)))
+
 (defn- body-lines [body]
-  (->> (str/split (str body) #"[\n;]")
+  (->> (str/split (top-level body) #"[\n;]")
        (map str/trim)
        (remove str/blank?)))
 
@@ -63,21 +75,27 @@
         types (for [file files t (:types file)] (assoc t :idx (:idx file) :refs (refs file t)))
         funcs (for [file files f (:funcs file)] (assoc f :idx (:idx file)))
         methods (for [file files m (:methods file)] (assoc m :idx (:idx file)))
+        method-sets (reduce (fn [acc m] (update acc (:recv m) (fnil conj #{}) (:name m))) {} methods)
+        error-type? #(contains? (method-sets (:name %)) "Error")
         exported-types (filter #(exported? (:name %)) types)
-        ops (->> (concat (map #(assoc % :op (op (:name %) (not (exported? (:name %))))) types)
-                         (map #(assoc % :op (op (:name %) (not (exported? (:name %))))) funcs)
+        named-op #(assoc % :op (op (:name %) (not (exported? (:name %)))))
+        ops (->> (concat (map named-op types)
+                         (map named-op funcs)
                          (map #(assoc % :op (op (str (:recv %) "." (:name %)) true)) methods))
                  (sort-by (juxt :idx :pos))
                  (map :op)
-                 (reduce (fn [acc o] (if (some #(= (:name o) (:name %)) acc) acc (conj acc o))) []))]
+                 (reduce (fn [[acc seen] o]
+                           (if (seen (:name o)) [acc seen] [(conj acc o) (conj seen (:name o))]))
+                         [[] #{}])
+                 first)]
     {:ops ops
      :interfaces (into {}
                        (for [t types :when (= :interface (:kind t))]
                          [[own (:name t)] {:methods (interface-methods t) :embeds (:refs t)}]))
-     :method-sets (reduce (fn [acc m] (update acc (:recv m) (fnil conj #{}) (:name m))) {} methods)
+     :method-sets method-sets
      :inherits (->> types (mapcat :refs) (map first) (remove #{own}) distinct vec)
      :stereotype (when (and (some #(= :interface (:kind %)) exported-types)
-                            (not-any? #(= :struct (:kind %)) exported-types)
+                            (not-any? #(and (= :struct (:kind %)) (not (error-type? %))) exported-types)
                             (not-any? #(exported? (:name %)) funcs))
                    :interface)}))
 

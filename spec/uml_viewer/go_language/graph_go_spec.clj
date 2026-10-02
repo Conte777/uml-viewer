@@ -69,6 +69,8 @@
                   "\tReader\n"
                   "\tPut(id int, v string) error\n"
                   "}\n\n"
+                  "type NotFound struct{}\n\n"
+                  "func (NotFound) Error() string { return \"\" }\n\n"
                   "type Clock interface {\n"
                   "\tNow() int64\n"
                   "}\n"))
@@ -103,7 +105,12 @@
                   "var _ d.Clock = nil\n"))
   (spit-file dir "memory/mem.go"
              (str "package memory\n\n"
-                  "type Mem struct{}\n\n"
+                  "import \"example.com/bank/model\"\n\n"
+                  "type Mem struct {\n"
+                  "\tInner struct {\n"
+                  "\t\tmodel.Base\n"
+                  "\t}\n"
+                  "}\n\n"
                   "func (m *Mem) Now() int64 { return 0 }\n"
                   "func (m *Mem) Get(id int) (string, error) { return \"\", nil }\n"
                   "func (m *Mem) List() []string { return nil }\n"))
@@ -133,6 +140,7 @@
           typed (set (keep (fn [{:keys [from to kind]}]
                              (when (not= :dependency kind) [from to kind]))
                            (:edges g)))]
+      (should= :interface (:stereotype (by-id :deps)))
       (should= #{[:store.postgres :deps :implements]
                  [:store.postgres :model :inheritance]
                  [:memory :deps :implements]
@@ -140,7 +148,6 @@
                  [:journal :audit :implements]
                  [:audit :deps :inheritance]}
                typed)
-      (should= :interface (:stereotype (by-id :deps)))
       (should= :interface (:stereotype (by-id :audit)))
       (should-be-nil (:stereotype (by-id :model)))
       (should-be-nil (:stereotype (by-id :store.postgres)))
@@ -154,7 +161,8 @@
                (:ops (by-id :store.postgres)))
       (should= ["Base" "User" "User.Name" "NewUser" "lower"]
                (map :name (:ops (by-id :model))))
-      (should= ["Domain" "ReleaseFn" "Reader" "Store" "Clock"] (map :name (:ops (by-id :deps)))))))
+      (should= ["Domain" "ReleaseFn" "Reader" "Store" "NotFound" "NotFound.Error" "Clock"]
+               (map :name (:ops (by-id :deps)))))))
 
 (describe "go graph"
   (it "makes one class per package with import edges and foreign packages"
@@ -203,6 +211,16 @@
           parsed (write-shop (temp-root))
           _ (spit (io/file parsed "go.mod")
                   "module example.com/shop\n\ngo 1.99\n\nrequire github.com/lib/pq v1.10.9\n")
+          _ (doseq [root [listed parsed]]
+              (spit-file root "internal/model/native.go"
+                         (str "package model\n\n"
+                              "// #include <stdlib.h>\n"
+                              "import \"C\"\n\n"
+                              "type Native struct{}\n")))
+          _ (java.nio.file.Files/createSymbolicLink
+              (.toPath (io/file parsed "internal/model/loop"))
+              (.toPath (io/file parsed "internal"))
+              (make-array java.nio.file.attribute.FileAttribute 0))
           _ (spit-file parsed "vendor/github.com/lib/pq/conn.go"
                        "package pq\n\nimport \"example.com/shop/internal/model\"\n")
           _ (spit-file parsed "internal/model/strings.go"
@@ -219,6 +237,7 @@
           err (java.io.StringWriter.)
           from-source (binding [*err* err] (scan parsed))]
       (should (str/includes? (str err) "go list"))
+      (should= (count (:classes from-list)) (count (:classes from-source)))
       (should= (set (:edges from-list)) (set (:edges from-source)))
       (should= (set (map #(dissoc % :file) (:classes from-list)))
                (set (map #(dissoc % :file) (:classes from-source))))
